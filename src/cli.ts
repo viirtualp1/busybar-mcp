@@ -16,8 +16,6 @@ import {
 import {
   hasClaudeHooks,
   hasCodexNotify,
-  installClaudeHooks,
-  installCodexNotify,
   uninstallClaudeHooks,
   uninstallCodexNotify,
 } from './install/hooks.js';
@@ -31,8 +29,6 @@ type Flags = {
   yes: boolean;
   only?: ClientId[];
   desktopJson: boolean;
-  /** Undefined: ask (or yes with --yes). */
-  notify?: boolean;
   settings: Settings;
 };
 
@@ -53,7 +49,6 @@ Install options:
   --github-token <token>      otherwise \`gh auth token\` is used
   --only <ids>                comma-separated: claude-code,codex,claude-desktop
   --desktop-json              Claude Desktop: write the config file instead of opening the extension
-  --no-notify                 don't show a summary on the Bar when Claude Code / Codex finish an answer
 `;
 
 const bundleFile = fileURLToPath(import.meta.url);
@@ -81,11 +76,8 @@ function parseFlags(argv: string[]): Flags {
       case '--desktop-json':
         flags.desktopJson = true;
         break;
-      case '--notify':
-        flags.notify = true;
-        break;
       case '--no-notify':
-        flags.notify = false;
+        // Keep existing install scripts working now that automatic notifications are gone.
         break;
       case '--addr':
         flags.settings.BUSY_ADDR = value(i++);
@@ -126,7 +118,7 @@ async function reachBar(settings: Settings) {
   }
 }
 
-async function askSettings(current: Settings, notifyFlag?: boolean) {
+async function askSettings(current: Settings) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const ask = async (question: string, fallback = '') => {
     const answer = (await rl.question(fallback ? `${question} [${fallback}]: ` : `${question}: `)).trim();
@@ -137,17 +129,13 @@ async function askSettings(current: Settings, notifyFlag?: boolean) {
   try {
     const addr = await ask('BUSY Bar address (IP on your Wi-Fi, 10.0.4.20 over USB)', current.BUSY_ADDR || '10.0.4.20');
     const cloud = /api\.busy\.app/i.test(addr);
-    const settings: Settings = {
+    return {
       ...current,
       BUSY_ADDR: addr,
       BUSY_TOKEN: cloud ? await ask('BUSY cloud token', current.BUSY_TOKEN) : current.BUSY_TOKEN,
       BUSY_HTTP_PASSWORD: cloud ? current.BUSY_HTTP_PASSWORD : await ask('HTTP access password (empty if none)', current.BUSY_HTTP_PASSWORD),
       GITHUB_TOKEN: await ask('GitHub token (empty to use `gh auth token`)', current.GITHUB_TOKEN),
-    };
-    const notifyAnswer =
-      notifyFlag ?? !/^n/i.test(await ask('Show a summary on the Bar when Claude Code / Codex finish an answer? (Y/n)', 'Y'));
-
-    return { settings, notify: notifyAnswer };
+    } satisfies Settings;
   } finally {
     rl.close();
   }
@@ -163,23 +151,11 @@ function targets(only?: ClientId[]) {
   return CLIENTS.filter((client) => (only ? only.includes(client.id) : client.detect()));
 }
 
-/** The skill, and the answer-ready notification where the client has a hook for it. */
-function extras(id: ClientId, launch: Launch, withNotify: boolean): Outcome[] {
-  const skill = installSkills(id === 'codex' ? 'codex' : 'claude');
-
-  if (!withNotify) {
-    return [...skill, ...(id === 'codex' ? [uninstallCodexNotify()] : [uninstallClaudeHooks()])];
-  }
-
-  return [...skill, id === 'codex' ? installCodexNotify(launch) : installClaudeHooks(launch)];
-}
-
 async function install(flags: Flags) {
   let settings: Settings = { ...readSettings(), ...flags.settings };
-  let withNotify = flags.notify ?? true;
 
   if (!flags.yes && process.stdin.isTTY) {
-    ({ settings, notify: withNotify } = await askSettings(settings, flags.notify));
+    settings = await askSettings(settings);
   }
 
   writeSettings(settings);
@@ -202,7 +178,8 @@ async function install(flags: Flags) {
   for (const client of chosen) {
     if (client.id !== 'claude-desktop') {
       outcomes.push(await client.install(launch));
-      outcomes.push(...extras(client.id, launch, withNotify));
+      outcomes.push(...installSkills(client.id === 'codex' ? 'codex' : 'claude'));
+      outcomes.push(client.id === 'codex' ? uninstallCodexNotify() : uninstallClaudeHooks());
       continue;
     }
 
@@ -223,7 +200,6 @@ async function install(flags: Flags) {
   console.log('\nStart a new Claude Code / Codex session to see the busybar tools.');
 }
 
-/** Brings every install this machine already has up to this version, keeping the choices made at install. */
 async function update() {
   mkdirSync(HOME_DIR, { recursive: true });
   copyFileSync(bundleFile, SERVER_FILE);
@@ -242,14 +218,14 @@ async function update() {
     if (hasSkill(id)) {
       outcomes.push(...installSkills(id));
     }
+  }
 
-    if (id === 'claude' && hasClaudeHooks()) {
-      outcomes.push(installClaudeHooks(launch));
-    }
+  if (hasClaudeHooks()) {
+    outcomes.push(uninstallClaudeHooks());
+  }
 
-    if (id === 'codex' && hasCodexNotify()) {
-      outcomes.push(installCodexNotify(launch));
-    }
+  if (hasCodexNotify()) {
+    outcomes.push(uninstallCodexNotify());
   }
 
   if (hasDesktopJsonEntry()) {
@@ -306,7 +282,10 @@ async function doctor() {
     console.log(`  ${client.name}: ${client.detect() ? client.status() : 'not found'}`);
   }
 
-  console.log(`  notifications: Claude Code ${hasClaudeHooks() ? 'on' : 'off'}, Codex ${hasCodexNotify() ? 'on' : 'off'}`);
+  if (hasClaudeHooks() || hasCodexNotify()) {
+    console.log('  legacy notification hooks found. Run npx busybar-mcp@latest update to remove them.');
+  }
+
   console.log(`  skill: Claude Code ${hasSkill('claude') ? 'on' : 'off'}, Codex ${hasSkill('codex') ? 'on' : 'off'}`);
 
   console.log(`  Bar at ${settings.BUSY_ADDR || '10.0.4.20'} ${await reachBar(settings)}`);
@@ -343,8 +322,7 @@ async function main() {
         process.stdout.write(SKILL);
         break;
       case 'notify':
-        applySettings();
-        await notify(rest);
+        notify(rest);
         break;
       case '--version':
       case '-v':

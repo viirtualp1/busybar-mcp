@@ -37,7 +37,7 @@ export type Scene = {
   ledColor?: string;
   /** Draw over anything, an active BUSY work session included. */
   urgent?: boolean;
-  /** Skip the photo of the real screen after drawing; the notifier has no one to show it to. */
+  /** Skip the photo of the real screen after drawing. */
   photo?: boolean;
   /** Seconds until the Bar removes everything in the scene by itself; 0 or unset keeps it. */
   timeout?: number;
@@ -54,7 +54,6 @@ export type DrawResult = {
 
 export type StockKind = 'images' | 'animations' | 'sounds';
 
-/** The notifier draws under its own name, so a notification never wipes what the MCP tools drew. */
 export const APP_NAME = process.env.BUSYBAR_APP || 'claude';
 
 export const SCREEN = {

@@ -6,7 +6,7 @@ export type Settings = Partial<Record<SettingKey, string>>;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
-export const SETTING_KEYS = ['BUSY_ADDR', 'BUSY_HTTP_PASSWORD', 'BUSY_TOKEN', 'GITHUB_TOKEN', 'BUSYBAR_DRY_RUN', 'DRAW_PRIORITY', 'BUSYBAR_NOTIFY_SECONDS', 'BUSYBAR_NOTIFY_SOUND'] as const;
+export const SETTING_KEYS = ['BUSY_ADDR', 'BUSY_HTTP_PASSWORD', 'BUSY_TOKEN', 'GITHUB_TOKEN', 'BUSYBAR_DRY_RUN', 'DRAW_PRIORITY'] as const;
 
 export const HOME_DIR = process.env.BUSYBAR_MCP_HOME || join(homedir(), '.busybar-mcp');
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0
+
+- The Bar stays on your chosen display when Claude Code or Codex finishes a turn or waits for input. Ask your assistant for a Bar notification when you want one.
+- Updating removes legacy BUSY Bar hooks and restores any previous Codex notifier.
+
 ## 0.7.1
 
 - The back screen shows up to three lines of the answer, with Markdown and brief opening filler removed.

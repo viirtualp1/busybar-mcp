@@ -7,6 +7,8 @@ description: Show things on the user's BUSY Bar (an LED status display with a 72
 
 The busybar MCP server's tools do the work; this skill says how to use them well.
 
+- Only send a notification or play a chime when the user explicitly asks for it. For a requested
+  completion notification, use `bar_text` when the task finishes, and `bar_sound` if they asked for sound.
 - Text: `bar_text` (one or two lines). Pixel art: `bar_pixels`. Pictures: `bar_image` (path or URL).
   Built-in media: `bar_stock` lists it, then `bar_animation`, `bar_image` with `stock`, `bar_sound` with `stock`.
   Melodies: `bar_sound` with `melody`, e.g. "C5:150 E5:150 G5:150 C6:400".

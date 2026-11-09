@@ -1,7 +1,7 @@
 {
   "name": "busybar",
-  "version": "0.7.1",
-  "description": "Draw, show pictures and play sounds on your BUSY Bar, and see a summary of every answer on it when Claude finishes.",
+  "version": "0.8.0",
+  "description": "Draw, show pictures and play sounds on your BUSY Bar.",
   "author": {
     "name": "viirtualp1",
     "url": "https://github.com/viirtualp1"
@@ -42,18 +42,6 @@
       "description": "For the GitHub tools. Empty: uses `gh auth token` if the GitHub CLI is logged in.",
       "default": "",
       "sensitive": true
-    },
-    "NOTIFY": {
-      "type": "boolean",
-      "title": "Answer-ready notifications",
-      "description": "Show a short summary on the Bar when Claude finishes an answer or waits for you.",
-      "default": true
-    },
-    "NOTIFY_SOUND": {
-      "type": "boolean",
-      "title": "Notification chime",
-      "description": "Play a short chime with each notification.",
-      "default": true
     }
   }
 }

@@ -61,9 +61,8 @@ What changed is in the [changelog](./CHANGELOG.md). To hear about releases on Gi
 
 Works on both screens: the front colour strip and the back greyscale panel.
 
-**Answer-ready notifications.** When Claude Code or Codex finishes an answer, the Bar shows its logo and a short
-summary of the answer, blinks and chimes; Claude Code also shows when it is waiting for your permission. Turn it off in `/plugin` settings
-(Claude Code) or with `npx busybar-mcp install --no-notify` (Codex).
+**Notifications are per request.** Ask your assistant to put a message on the Bar when a task finishes, or ask for a chime.
+Updating removes the previous BUSY Bar notification hooks and restores any earlier Codex notifier.
 
 ## Settings
 
