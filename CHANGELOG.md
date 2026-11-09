@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- Notifications are glanceable instead of a scrolling paragraph: the logo, **Ready** / **Needs you**, the time, the
+  project and how long the turn took; the date only when the day changed. The back keeps a two-line gist.
+
 ## 0.6.0
 
 - Tells you when a new version is out: `bar_status` and the first answer of a session mention it, with how to update.

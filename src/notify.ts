@@ -1,21 +1,25 @@
 // `busybar-mcp notify`: called by Claude Code hooks (JSON on stdin) and by Codex's `notify`
-// (JSON as the last argument) when an answer is ready, to put a short summary on the Bar.
+// (JSON as the last argument) when an answer is ready: who answered, when, where, how long it took.
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import type { Scene } from './bar.js';
 import { LOGOS } from './logos.js';
 import { HOME_DIR } from './settings.js';
 import { summarize, wrap } from './text.js';
 
-type Event = {
+export type Event = {
   agent: 'Claude' | 'Codex';
   kind: 'ready' | 'waiting';
   project?: string;
   text: string;
+  /** When the turn began, if the transcript says; for "worked 4m" and a date when the day changed. */
+  startedAt?: Date;
 };
 
 type TranscriptLine = {
   type?: string;
+  timestamp?: string;
   message?: { content?: string | Array<{ type?: string; text?: string }> };
 };
 
@@ -24,6 +28,12 @@ export const CODEX_CHAIN_FILE = join(HOME_DIR, 'codex-notify-next.json');
 const COLORS = { ready: '#2ECC71', waiting: '#F5B041' };
 
 const CHIME = { ready: 'E6:70 G6:70 C7:140', waiting: 'A5:90 R:60 A5:90' };
+
+const TITLE = { ready: 'Ready', waiting: 'Needs you' };
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 async function readStdin() {
   if (process.stdin.isTTY) {
@@ -110,6 +120,54 @@ function lastAnswer(transcriptPath: string) {
   return '';
 }
 
+/** The time of the last message the user typed, which is when this turn began. */
+function turnStart(transcriptPath: string) {
+  if (!existsSync(transcriptPath)) {
+    return undefined;
+  }
+
+  const lines = readFileSync(transcriptPath, 'utf8').trim().split('\n');
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const line = JSON.parse(lines[i]) as TranscriptLine;
+
+      if (line.type === 'user' && !usesTool(line) && textOf(line) && line.timestamp) {
+        const at = new Date(line.timestamp);
+        return Number.isNaN(at.getTime()) ? undefined : at;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return undefined;
+}
+
+function clock(at: Date) {
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+}
+
+function day(at: Date) {
+  return `${WEEKDAYS[at.getDay()]} ${at.getDate()} ${MONTHS[at.getMonth()]}`;
+}
+
+function duration(ms: number) {
+  const seconds = Math.round(ms / 1000);
+
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+
+  if (minutes < 60) {
+    return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`;
+  }
+
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
+}
+
 function fromClaude(payload: Record<string, unknown>): Event | undefined {
   const project = typeof payload.cwd === 'string' ? basename(payload.cwd) : undefined;
 
@@ -121,14 +179,10 @@ function fromClaude(payload: Record<string, unknown>): Event | undefined {
     return undefined;
   }
 
-  const text =
-    typeof payload.last_assistant_message === 'string'
-      ? payload.last_assistant_message
-      : typeof payload.transcript_path === 'string'
-        ? lastAnswer(payload.transcript_path)
-        : '';
+  const transcript = typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
+  const text = typeof payload.last_assistant_message === 'string' ? payload.last_assistant_message : lastAnswer(transcript);
 
-  return { agent: 'Claude', kind: 'ready', project, text };
+  return { agent: 'Claude', kind: 'ready', project, text, startedAt: transcript ? turnStart(transcript) : undefined };
 }
 
 function fromCodex(payload: Record<string, unknown>): Event | undefined {
@@ -165,44 +219,60 @@ function forwardCodex(payloadArg: string | undefined) {
   }
 }
 
-async function show(event: Event) {
-  const { draw, playSound, text } = await import('./bar.js');
-  const { melodyToSnd } = await import('./media/sound.js');
+/** What the notification looks like on each screen; `now` is passed in so a preview can pin the clock. */
+export async function notificationScenes(event: Event, now: Date) {
+  const { text } = await import('./bar.js');
   const seconds = Number(process.env.BUSYBAR_NOTIFY_SECONDS) || 300;
   const color = COLORS[event.kind];
   const logo = LOGOS[event.agent === 'Claude' ? 'claude' : 'codex'];
-  const title = event.kind === 'ready' ? 'ready' : 'needs you';
-  const summary = summarize(event.text, 170) || (event.kind === 'ready' ? 'Done.' : 'Waiting for you.');
-  const header = event.project ?? event.agent;
-  const lines = wrap(summary, 23, 6);
+  const time = clock(now);
+  const dayChanged = Boolean(event.startedAt && event.startedAt.toDateString() !== now.toDateString());
+  const project = event.project ?? event.agent;
+  const where = dayChanged ? `${time} ${day(now)} ${project}` : `${time} ${project}`;
+  const worked = event.startedAt && event.kind === 'ready' ? `worked ${duration(now.getTime() - event.startedAt.getTime())}` : '';
+  const gist = wrap(summarize(event.text, 70), 35, 2);
 
-  const front = await draw({
+  const front: Scene = {
     display: 'front',
     photo: false,
     timeout: seconds,
     ledColor: color,
     pixels: [{ ...logo.front, x: 0, y: 0 }],
     elements: [
-      text('title', title, { x: 18, y: 0, width: 54, color }),
-      text('summary', summary, { x: 18, y: 8, width: 54, color: '#DDDDDD', scroll_rate: summary.length > 13 ? 900 : undefined }),
+      text('title', TITLE[event.kind], { x: 18, y: 0, width: 54, color }),
+      text('where', where, { x: 18, y: 8, width: 54, color: '#BBBBBB', scroll_rate: where.length > 13 ? 900 : undefined }),
     ],
-  });
+  };
 
-  if (!front.sent) {
-    // Refused for priority means a BUSY session or another app owns the Bar: stay quiet.
-    return;
-  }
-
-  await draw({
+  const back: Scene = {
     display: 'back',
     photo: false,
     timeout: seconds,
     pixels: [{ ...logo.back, x: 2, y: 4 }],
     elements: [
-      text('header', header, { x: 48, y: 4, width: 96, color: '#888888' }),
-      ...lines.map((line, i) => text(`line${i}`, line, { x: 48, y: 16 + i * 10, width: 96 })),
+      text('title', TITLE[event.kind], { x: 48, y: 4, font: 'bold' }),
+      text('time', time, { x: 145, y: 4, align: 'top_right', font: 'bold' }),
+      text('project', project, { x: 48, y: 18, width: 97 }),
+      ...(worked ? [text('worked', worked, { x: 48, y: 29, width: 97, color: '#999999' })] : []),
+      ...(dayChanged ? [text('day', day(now), { x: 48, y: 40, width: 97, color: '#999999' })] : []),
+      ...gist.map((line, i) => text(`gist${i}`, line, { x: 4, y: 52 + i * 11, width: 141, color: '#BBBBBB' })),
     ],
-  });
+  };
+
+  return { front, back };
+}
+
+async function show(event: Event) {
+  const { draw, playSound } = await import('./bar.js');
+  const { melodyToSnd } = await import('./media/sound.js');
+  const { front, back } = await notificationScenes(event, new Date());
+
+  if (!(await draw(front)).sent) {
+    // Refused for priority means a BUSY session or another app owns the Bar: stay quiet.
+    return;
+  }
+
+  await draw(back);
 
   if (process.env.BUSYBAR_NOTIFY_SOUND !== '0') {
     await playSound({ snd: melodyToSnd(CHIME[event.kind], 'sine') });
