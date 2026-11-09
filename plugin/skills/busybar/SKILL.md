@@ -9,13 +9,16 @@ The busybar MCP server's tools do the work; this skill says how to use them well
 
 - Only send a notification or play a chime when the user explicitly asks for it. For a requested
   completion notification, use `bar_text` when the task finishes, and `bar_sound` if they asked for sound.
+- Use `busybar_show_message` for text that should disappear by itself. Use `busybar_start_timer` for a countdown. These use the optional window manager.
+- Use `busybar_get_status` and `busybar_get_connectivity` for read-only diagnostics.
+- Use `busybar_list_apps` before switching apps, and `busybar_return_to_auto` to release a pin.
 - Text: `bar_text` (one or two lines). Pixel art: `bar_pixels`. Pictures: `bar_image` (path or URL).
   Built-in media: `bar_stock` lists it, then `bar_animation`, `bar_image` with `stock`, `bar_sound` with `stock`.
   Melodies: `bar_sound` with `melody`, e.g. "C5:150 E5:150 G5:150 C6:400".
 - `display: "front"` is the strip other people see; `"back"` faces the user and holds more text.
 - The fonts are ASCII only. Non-Latin text is transliterated, so keep it short and plain.
 - Front fits about 17 characters per line; write a status, not a sentence.
-- Every drawing tool returns an image of the result. Look at it, and redraw if it is wrong.
+- Media drawing tools return an image. With the WM connected, a screenshot can show whichever app it selected.
 - "Not drawn due to low priority" means a BUSY work session owns the Bar. Pass `urgent: true` only if the user
   asked to interrupt it.
 - When finished with a temporary message, `bar_clear` gives the screen back.

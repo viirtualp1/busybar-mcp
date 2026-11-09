@@ -13,6 +13,7 @@ import { BACK, FRONT } from 'busybar-kit/device';
 import { isLowPriority } from 'busybar-kit/errors';
 import { Bitmap, parseColor, renderOnto, type Rgba } from 'busybar-kit/preview';
 import type { Display } from './media/image.js';
+import { wmCommand } from './wm.js';
 import { toAscii } from './text.js';
 
 export type { Display };
@@ -82,7 +83,7 @@ const REACH_HINT =
   'Check the Bar is on and plugged in over USB (or on the same Wi-Fi). On macOS 15+, the app running this ' +
   '(Claude, ChatGPT/Codex) also needs System Settings → Privacy & Security → Local Network turned on.';
 
-let { bar: config, warnings } = loadBarConfig();
+let { bar: config, warnings } = barConfig();
 
 const dryRun = process.env.BUSYBAR_DRY_RUN === '1';
 
@@ -98,6 +99,12 @@ const uploaded = new Set<string>();
 
 const stockCache = new Map<StockKind, string[]>();
 
+function barConfig() {
+  const loaded = loadBarConfig();
+
+  return { ...loaded, warnings: loaded.warnings.filter((warning) => !warning.startsWith('Wi-Fi needs')) };
+}
+
 function makeClient() {
   return new BusyBar({
     addr: config.busyAddr,
@@ -109,7 +116,7 @@ function makeClient() {
 
 /** Points the running server at another Bar (after `env` changed), forgetting what it knew about the old one. */
 export function reconnect() {
-  ({ bar: config, warnings } = loadBarConfig());
+  ({ bar: config, warnings } = barConfig());
   client = makeClient();
   shown.front = [];
   shown.back = [];
@@ -285,13 +292,16 @@ export function preview(scene: Scene) {
   return bitmap.scale(PREVIEW_SCALE[display]).toPng();
 }
 
-async function upload(file: string, data: Buffer) {
-  if (uploaded.has(file)) {
+async function upload(connected: BusyBar, file: string, data: Buffer) {
+  if (connected === client && uploaded.has(file)) {
     return;
   }
 
-  await client.assetsUpload({ application_name: APP_NAME, file, data });
-  uploaded.add(file);
+  await connected.assetsUpload({ application_name: APP_NAME, file, data });
+
+  if (connected === client) {
+    uploaded.add(file);
+  }
 }
 
 /** Content-addressed, so the same picture or sound is uploaded once. */
@@ -299,12 +309,12 @@ export function assetName(prefix: string, data: Buffer, ext: string) {
   return `${prefix}-${createHash('sha1').update(data).digest('hex').slice(0, 12)}.${ext}`;
 }
 
-async function imageElement(id: string, image: SceneImage): Promise<ImageElement | AnimationElement> {
+async function imageElement(connected: BusyBar, id: string, image: SceneImage): Promise<ImageElement | AnimationElement> {
   const base = { id, align: 'top_left' as const, x: image.x, y: image.y, timeout: 0 };
 
   if (image.kind === 'upload') {
     const file = assetName('img', image.png, 'png');
-    await upload(file, image.png);
+    await upload(connected, file, image.png);
 
     return { ...base, type: 'image', path: file };
   }
@@ -325,7 +335,13 @@ export async function draw(scene: Scene): Promise<DrawResult> {
   }
 
   try {
-    const pictures = await Promise.all((scene.images ?? []).map((image, i) => imageElement(`img${i}`, image)));
+    const connected = client;
+    const pictures = await Promise.all((scene.images ?? []).map((image, i) => imageElement(connected, `img${i}`, image)));
+
+    if (connected !== client) {
+      throw new Error('The BUSY Bar connection changed. Retry the display command.');
+    }
+
     const elements = [
       ...scene.elements.filter((e) => e.type === 'rectangle'),
       ...pictures,
@@ -339,13 +355,17 @@ export async function draw(scene: Scene): Promise<DrawResult> {
       ...(scene.timeout ? { timeout: scene.timeout } : {}),
     }));
 
-    await clearOwn(synced ? shown[display] : undefined);
-    await client.displayDraw({
+    await clearOwn(connected, synced ? shown[display] : undefined);
+    await connected.displayDraw({
       application_name: APP_NAME,
       priority: scene.urgent ? 100 : config.drawPriority,
       led_notification_color: scene.ledColor ? rgba(scene.ledColor) : undefined,
       elements,
     });
+
+    if (connected !== client) {
+      return { sent: true, preview: png };
+    }
 
     if (!synced) {
       shown.front = [];
@@ -383,26 +403,46 @@ export async function clear(display?: Display) {
     return;
   }
 
+  const connected = client;
+  const { busyAddr, isUsb, isCloud } = config;
+
+  if (!isUsb && !isCloud) {
+    await wmCommand(busyAddr, { action: 'clear', display }, { optional: true });
+
+    if (connected !== client) {
+      return;
+    }
+  }
+
   if (display && synced) {
-    await clearOwn(shown[display]);
-    shown[display] = [];
+    await clearOwn(connected, shown[display]);
+
+    if (connected === client) {
+      shown[display] = [];
+    }
+
     return;
   }
 
-  await clearOwn();
+  await clearOwn(connected);
+
+  if (connected !== client) {
+    return;
+  }
+
   shown.front = [];
   shown.back = [];
   synced = true;
 }
 
 /** The Bar answers 400 when this app has nothing on screen, which is the state we want anyway. */
-async function clearOwn(ids?: string[]) {
+async function clearOwn(connected: BusyBar, ids?: string[]) {
   if (ids && ids.length === 0) {
     return;
   }
 
   try {
-    await client.displayClear({ application_name: APP_NAME, element_ids: ids });
+    await connected.displayClear({ application_name: APP_NAME, element_ids: ids });
   } catch (err) {
     const nothingShown = err instanceof Error && 'status' in err && err.status === 400 && /not displaying/i.test(describe(err));
 
@@ -454,18 +494,55 @@ export async function playSound(sound: { stock: string } | { snd: Buffer }) {
     return;
   }
 
+  const connected = client;
+
   if ('stock' in sound) {
-    await client.audioPlay({ application_name: APP_NAME, stock_path: `shared/${sound.stock}` });
+    await connected.audioPlay({ application_name: APP_NAME, stock_path: `shared/${sound.stock}` });
     return;
   }
 
   const file = assetName('snd', sound.snd, 'snd');
-  await upload(file, sound.snd);
-  await client.audioPlay({ application_name: APP_NAME, path: file });
+  await upload(connected, file, sound.snd);
+  await connected.audioPlay({ application_name: APP_NAME, path: file });
 }
 
 export async function status() {
   return client.systemStatusGet();
+}
+
+export async function diagnostics() {
+  const connected = client;
+  const [system, updates, autoUpdate] = await Promise.all([
+    readDiagnostic(() => connected.systemStatusGet()),
+    readDiagnostic(() => connected.updateStatusGet()),
+    readDiagnostic(() => connected.updateAutoUpdateGet()),
+  ]);
+
+  return { system, updates, autoUpdate };
+}
+
+export async function connectivity() {
+  const connected = client;
+  const [wifi, ble, transport, interfaces] = await Promise.all([
+    readDiagnostic(() => connected.wifiStatusGet()),
+    readDiagnostic(() => connected.bleStatusGet()),
+    readDiagnostic(() => connected.systemTransportGet()),
+    readDiagnostic(async () => {
+      const { usb_mac: usb, wifi_mac: wifi, ble_mac: ble } = await connected.systemStatusDeviceGet();
+
+      return { usb, wifi, ble };
+    }),
+  ]);
+
+  return { wifi, ble, transport, interfaces };
+}
+
+async function readDiagnostic<T>(read: () => Promise<T>) {
+  try {
+    return { value: await read() };
+  } catch (error) {
+    return { error: describe(error) };
+  }
 }
 
 export function describe(err: unknown) {

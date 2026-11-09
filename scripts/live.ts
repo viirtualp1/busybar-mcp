@@ -31,8 +31,16 @@ const WALK: Array<[string, Record<string, unknown>]> = [
   ['bar_clear', {}],
 ];
 
+const WM_WALK: typeof WALK = [
+  ['busybar_get_status', {}],
+  ['busybar_get_connectivity', {}],
+  ['busybar_list_apps', {}],
+  ['busybar_show_message', { message: 'MCP test', durationSeconds: 2 }],
+  ['busybar_start_timer', { durationSeconds: 3 }],
+];
+
 const [name, json] = process.argv.slice(2);
-const calls: Array<[string, Record<string, unknown>]> = name ? [[name, JSON.parse(json ?? '{}')]] : WALK;
+const calls = name === '--wm' ? WM_WALK : name ? [[name, JSON.parse(json ?? '{}')] as (typeof WALK)[number]] : WALK;
 
 const client = new Client({ name: 'live', version: '0' });
 
@@ -55,6 +63,15 @@ for (const [index, [tool, args]] of calls.entries()) {
 
   if (img?.data) {
     writeFileSync(`live-${index}-${tool}.png`, Buffer.from(img.data, 'base64'));
+  }
+
+  if (res.isError) {
+    process.exitCode = 1;
+  }
+
+  if (tool === 'busybar_show_message' || tool === 'busybar_start_timer') {
+    const duration = Number(args.durationSeconds ?? 10);
+    await new Promise((done) => setTimeout(done, duration * 1000 + 250));
   }
 
   if (tool === 'bar_animation' || tool.startsWith('bar_sound')) {

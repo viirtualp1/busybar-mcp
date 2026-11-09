@@ -35,7 +35,7 @@ const manifest = {
   name: 'busybar',
   display_name: 'BUSY Bar',
   version: pkg.version,
-  description: 'Let Claude draw and play sounds on your BUSY Bar: text, pixel art, pictures, animations, melodies, GitHub and weather, on both screens.',
+  description: 'Control your BUSY Bar and read device diagnostics. Supports optional busybar-wm integration.',
   long_description:
     'Unofficial community extension, not affiliated with Flipper Devices / BUSY.\n\n' +
     'Every drawing tool returns a preview image, so Claude sees what it drew. ' +
@@ -54,6 +54,7 @@ const manifest = {
       args: ['${__dirname}/server/index.mjs'],
       env: {
         BUSY_ADDR: '${user_config.busy_addr}',
+        WM_API_TOKEN: '${user_config.wm_api_token}',
         BUSY_HTTP_PASSWORD: '${user_config.busy_http_password}',
         BUSY_TOKEN: '${user_config.busy_token}',
         GITHUB_TOKEN: '${user_config.github_token}',
@@ -61,6 +62,14 @@ const manifest = {
     },
   },
   tools: [
+    { name: 'busybar_get_status', description: 'Read WM and hardware status' },
+    { name: 'busybar_get_connectivity', description: 'Read Wi-Fi, BLE and USB status' },
+    { name: 'busybar_list_apps', description: 'List apps managed by the WM' },
+    { name: 'busybar_switch_app', description: 'Pin a ready WM app' },
+    { name: 'busybar_show_message', description: 'Show an expiring WM overlay' },
+    { name: 'busybar_start_timer', description: 'Show a countdown on the Bar' },
+    { name: 'busybar_return_to_auto', description: 'Resume automatic WM scheduling' },
+    { name: 'busybar_send_input', description: 'Route a supported input to a WM app' },
     { name: 'bar_text', description: 'Show one or two lines of text' },
     { name: 'bar_pixels', description: 'Draw pixel art from a palette and a grid' },
     { name: 'bar_progress', description: 'Show a labelled progress bar' },
@@ -83,9 +92,16 @@ const manifest = {
   user_config: {
     busy_addr: {
       type: 'string',
-      title: 'BUSY Bar address',
-      description: 'IP on your Wi-Fi, 10.0.4.20 over USB, or https://api.busy.app with a cloud token. Empty: saved settings or USB.',
+      title: 'BUSY Bar or window manager address',
+      description: 'Defaults to saved settings or 10.0.4.20 over USB.',
       required: false,
+    },
+    wm_api_token: {
+      type: 'string',
+      title: 'Window manager API token',
+      description: 'Match WM_API_TOKEN on the window manager, if configured.',
+      required: false,
+      sensitive: true,
     },
     busy_http_password: {
       type: 'string',
@@ -181,9 +197,16 @@ const pluginManifest = {
   userConfig: {
     BUSY_ADDR: {
       type: 'string',
-      title: 'BUSY Bar address',
-      description: 'IP on your Wi-Fi, 10.0.4.20 over USB, or https://api.busy.app with a cloud token. Empty: USB.',
+      title: 'BUSY Bar or window manager address',
+      description: 'Defaults to 10.0.4.20 over USB.',
       default: '',
+    },
+    WM_API_TOKEN: {
+      type: 'string',
+      title: 'Window manager API token',
+      description: 'Match WM_API_TOKEN on the window manager, if configured.',
+      default: '',
+      sensitive: true,
     },
     BUSY_HTTP_PASSWORD: {
       type: 'string',

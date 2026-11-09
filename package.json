@@ -1,6 +1,6 @@
 {
   "name": "busybar-mcp",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "MCP server that lets Claude and Codex draw and play sounds on a BUSY Bar, with a one-command installer and a Claude Desktop extension",
   "author": "viirtualp1",
   "license": "MIT",
@@ -38,6 +38,7 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/cli.ts",
+    "test": "node --import tsx --test test/*.test.ts",
     "smoke": "tsx scripts/smoke.ts",
     "prepack": "npm run typecheck && npm run build",
     "live": "tsx scripts/live.ts"

@@ -22,7 +22,7 @@ import {
 import { hasSkill, installSkills, uninstallSkills, SKILL } from './install/skill.js';
 import { notify } from './notify.js';
 import { checkForUpdate } from './update.js';
-import { applySettings, HOME_DIR, readSettings, SERVER_FILE, SETTINGS_FILE, writeSettings, type Settings } from './settings.js';
+import { applySettings, DEFAULT_BAR_ADDR, HOME_DIR, readSettings, SERVER_FILE, SETTINGS_FILE, writeSettings, type Settings } from './settings.js';
 import { VERSION } from './version.js';
 
 type Flags = {
@@ -43,9 +43,10 @@ Usage:
 
 Install options:
   --yes                       don't ask, take defaults and flags
-  --addr <ip|url>             Bar address (default 10.0.4.20, USB)
+  --addr <ip|url>             Bar or WM address (default 10.0.4.20 over USB)
   --password <pw>             HTTP access password, if the Bar has one
   --token <token>             BUSY cloud token (with --addr https://api.busy.app)
+  --wm-token <token>          WM_API_TOKEN if configured on the window manager
   --github-token <token>      otherwise \`gh auth token\` is used
   --only <ids>                comma-separated: claude-code,codex,claude-desktop
   --desktop-json              Claude Desktop: write the config file instead of opening the extension
@@ -88,6 +89,9 @@ function parseFlags(argv: string[]): Flags {
       case '--token':
         flags.settings.BUSY_TOKEN = value(i++);
         break;
+      case '--wm-token':
+        flags.settings.WM_API_TOKEN = value(i++);
+        break;
       case '--github-token':
         flags.settings.GITHUB_TOKEN = value(i++);
         break;
@@ -104,7 +108,7 @@ function parseFlags(argv: string[]): Flags {
 
 async function reachBar(settings: Settings) {
   const bar = new BusyBar({
-    addr: settings.BUSY_ADDR || '10.0.4.20',
+    addr: settings.BUSY_ADDR || DEFAULT_BAR_ADDR,
     token: settings.BUSY_TOKEN,
     HTTPAccessPassword: settings.BUSY_HTTP_PASSWORD,
     timeout: 3000,
@@ -127,7 +131,7 @@ async function askSettings(current: Settings) {
   };
 
   try {
-    const addr = await ask('BUSY Bar address (IP on your Wi-Fi, 10.0.4.20 over USB)', current.BUSY_ADDR || '10.0.4.20');
+    const addr = await ask('BUSY Bar or busybar-wm address', current.BUSY_ADDR || DEFAULT_BAR_ADDR);
     const cloud = /api\.busy\.app/i.test(addr);
     return {
       ...current,
@@ -160,7 +164,7 @@ async function install(flags: Flags) {
 
   writeSettings(settings);
   console.log(`\nSettings saved to ${SETTINGS_FILE}`);
-  console.log(`Bar at ${settings.BUSY_ADDR || '10.0.4.20'} ${await reachBar(settings)}`);
+  console.log(`Bar at ${settings.BUSY_ADDR || DEFAULT_BAR_ADDR} ${await reachBar(settings)}`);
 
   mkdirSync(HOME_DIR, { recursive: true });
   copyFileSync(bundleFile, SERVER_FILE);
@@ -288,7 +292,7 @@ async function doctor() {
 
   console.log(`  skill: Claude Code ${hasSkill('claude') ? 'on' : 'off'}, Codex ${hasSkill('codex') ? 'on' : 'off'}`);
 
-  console.log(`  Bar at ${settings.BUSY_ADDR || '10.0.4.20'} ${await reachBar(settings)}`);
+  console.log(`  Bar at ${settings.BUSY_ADDR || DEFAULT_BAR_ADDR} ${await reachBar(settings)}`);
 
   const newer = await checkForUpdate({ force: true });
   console.log(newer ? `  update: ${newer.latest} is out (${newer.url}); run npx busybar-mcp@latest update` : '  update: up to date');

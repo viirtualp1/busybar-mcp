@@ -1,6 +1,6 @@
 {
   "name": "busybar",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Draw, show pictures and play sounds on your BUSY Bar.",
   "author": {
     "name": "viirtualp1",
@@ -18,9 +18,16 @@
   "userConfig": {
     "BUSY_ADDR": {
       "type": "string",
-      "title": "BUSY Bar address",
-      "description": "IP on your Wi-Fi, 10.0.4.20 over USB, or https://api.busy.app with a cloud token. Empty: USB.",
+      "title": "BUSY Bar or window manager address",
+      "description": "Defaults to 10.0.4.20 over USB.",
       "default": ""
+    },
+    "WM_API_TOKEN": {
+      "type": "string",
+      "title": "Window manager API token",
+      "description": "Match WM_API_TOKEN on the window manager, if configured.",
+      "default": "",
+      "sensitive": true
     },
     "BUSY_HTTP_PASSWORD": {
       "type": "string",

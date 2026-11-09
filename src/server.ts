@@ -3,9 +3,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import {
+  ascii,
   clear,
+  connectivity,
   connectionInfo,
   describe,
+  diagnostics,
   draw,
   FRONT_ROW,
   listStock,
@@ -30,6 +33,7 @@ import { ciScene, inbox, inboxScene, latestCi } from './services/github.js';
 import { weather, weatherScene } from './services/weather.js';
 import { checkForUpdate, type UpdateInfo } from './update.js';
 import { VERSION } from './version.js';
+import { wmCommand, wmSnapshot } from './wm.js';
 
 const server = new McpServer({ name: 'busybar', version: VERSION });
 
@@ -42,7 +46,7 @@ const color = z.string().describe('Hex colour, #RRGGBB');
 const urgent = z
   .boolean()
   .optional()
-  .describe('Draw over an active BUSY work session or another app. Only when the user asked to interrupt.');
+  .describe('Request higher draw priority. Use only when asked to interrupt.');
 
 const display = z
   .enum(['front', 'back'])
@@ -63,7 +67,9 @@ function result(summary: unknown, drawn?: DrawResult): CallToolResult {
   let delivery: string | undefined;
 
   if (drawn?.sent) {
-    delivery = drawn.actual ? 'Shown on the BUSY Bar. The image is a photo of the real screen.' : 'Shown on the BUSY Bar.';
+    delivery = drawn.actual
+      ? 'Draw request accepted. The image shows what is currently on the Bar.'
+      : 'Draw request accepted. The image is a preview.';
   } else if (drawn) {
     delivery = drawn.error ? `NOT shown on the Bar: ${drawn.error.replace(/\.$/, '')}. The image is a preview only.` : 'Dry run: the image is a preview only.';
   }
@@ -95,6 +101,30 @@ function takeUpdateNotice() {
 
 async function show(scene: Scene, summary: unknown = '') {
   return result(summary, await draw(scene));
+}
+
+async function control(action: { action: string; [key: string]: unknown }) {
+  const { addr, dryRun } = connectionInfo();
+
+  if (dryRun) {
+    return result({ dryRun, action });
+  }
+
+  try {
+    return result(await wmCommand(addr, action));
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+async function wmStatus(addr: string) {
+  try {
+    const { activeApp, pinnedApp } = await wmSnapshot(addr);
+
+    return { connected: true, activeApp, pinnedApp };
+  } catch (error) {
+    return { connected: false, error: describe(error) };
+  }
 }
 
 async function stockExists(kind: StockKind, name: string) {
@@ -411,7 +441,7 @@ server.registerTool(
   'bar_clear',
   {
     title: 'Clear',
-    description: "Remove what this server drew, giving the screen back to the Bar's own apps. Both screens unless display is given.",
+    description: 'Dismiss temporary overlays and drawings from the MCP. Both screens unless display is given.',
     inputSchema: { display: z.enum(['front', 'back']).optional() },
   },
   async ({ display: where }) => {
@@ -445,9 +475,7 @@ server.registerTool(
   {
     title: 'Connect to a Bar',
     description:
-      'Point the server at a BUSY Bar and remember it: an IP on the Wi-Fi (shown in the Bar\'s Settings → Wi-Fi), ' +
-      '10.0.4.20 over USB, or https://api.busy.app with a cloud token. Use when the user tells you where their Bar is, ' +
-      'or when tools report the Bar cannot be reached and the user gives a new address.',
+      'Save a direct USB, Wi-Fi or cloud address, or a busybar-wm address for shared display orchestration.',
     inputSchema: {
       addr: z.string().min(1),
       password: z.string().optional().describe('HTTP access password, if the Bar has one'),
@@ -483,6 +511,126 @@ server.registerTool(
     } catch (err) {
       return result({ ...info, version: VERSION, update: update ?? null, reachable: false, error: describe(err) });
     }
+  },
+);
+
+server.registerTool(
+  'busybar_get_status',
+  {
+    description: 'Read WM connection and active app, plus device, power, uptime, firmware and update status.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {},
+  },
+  async () => {
+    const { addr, dryRun } = connectionInfo();
+
+    if (dryRun) {
+      return result({ addr, dryRun });
+    }
+
+    const [wm, device] = await Promise.all([wmStatus(addr), diagnostics()]);
+
+    return result({ addr, wm, device });
+  },
+);
+
+server.registerTool(
+  'busybar_get_connectivity',
+  {
+    description: 'Read Wi-Fi, Bluetooth Low Energy, and USB or Wi-Fi transport status from the Bar.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {},
+  },
+  async () => result(connectionInfo().dryRun ? { dryRun: true } : await connectivity()),
+);
+
+server.registerTool(
+  'busybar_list_apps',
+  {
+    description: 'List apps in the window manager manifest, including which are running and ready to show.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {},
+  },
+  async () => {
+    try {
+      const { activeApp, pinnedApp, apps } = await wmSnapshot(connectionInfo().addr);
+
+      return result({ activeApp, pinnedApp, apps });
+    } catch (error) {
+      return failure(error);
+    }
+  },
+);
+
+server.registerTool(
+  'busybar_switch_app',
+  {
+    description: 'Pin a ready app by its exact name from busybar_list_apps.',
+    inputSchema: { app: z.string().trim().min(1).max(128) },
+  },
+  async ({ app }) => control({ action: 'switch', app }),
+);
+
+server.registerTool(
+  'busybar_show_message',
+  {
+    description: 'Show a temporary WM overlay and automatically reveal the app underneath when it expires.',
+    inputSchema: {
+      message: z.string().trim().min(1).max(120),
+      durationSeconds: z.number().int().min(1).max(300).default(10),
+      display,
+    },
+  },
+  async ({ message, durationSeconds, display }) => {
+    const printable = ascii(message).trim().slice(0, 120);
+
+    if (!printable) {
+      return failure(new Error('The message needs at least one character the Bar can display.'));
+    }
+
+    return control({ action: 'message', text: printable, durationSeconds, display });
+  },
+);
+
+server.registerTool(
+  'busybar_start_timer',
+  {
+    description: 'Start a countdown overlay on the Bar. The WM removes it when time runs out.',
+    inputSchema: {
+      durationSeconds: z.number().int().min(1).max(86400),
+      label: z.string().max(120).optional(),
+      display,
+    },
+  },
+  async ({ durationSeconds, label, display }) => control({
+    action: 'timer', text: ascii(label ?? '').slice(0, 120), durationSeconds, display,
+  }),
+);
+
+server.registerTool(
+  'busybar_return_to_auto',
+  {
+    description: 'Release the current WM app pin and resume automatic display scheduling.',
+    inputSchema: {},
+  },
+  async () => control({ action: 'auto' }),
+);
+
+server.registerTool(
+  'busybar_send_input',
+  {
+    description: 'Route an OK or START tap, or an encoder step, to an app listening through the WM. Supply delta only for the encoder.',
+    inputSchema: {
+      key: z.enum(['ok', 'start', 'encoder']),
+      delta: z.number().int().min(-10).max(10).optional(),
+    },
+  },
+  async ({ key, delta }) => {
+    if (key === 'encoder' ? !delta : delta !== undefined) {
+      return failure(new Error('Only the encoder takes a nonzero delta.'));
+    }
+
+    return control({ action: 'input', key, delta });
   },
 );
 

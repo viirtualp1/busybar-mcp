@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0
+
+- Connect directly over USB with the default settings to draw, play sounds, and read device diagnostics.
+- Read battery, uptime, firmware and update status, Wi-Fi, Bluetooth Low Energy, and USB transport details.
+- Connect through busybar-wm 2.1.0 or later for app switching, automatic scheduling, input routing, temporary messages, and countdowns. The window manager reveals the app underneath when an overlay expires.
+
 ## 0.8.0
 
 - The Bar stays on your chosen display when Claude Code or Codex finishes a turn or waits for input. Ask your assistant for a Bar notification when you want one.
