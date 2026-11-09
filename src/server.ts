@@ -42,7 +42,7 @@ const display = z
 
 /** Where text goes on each screen. The back has room for a bigger first line. */
 const LAYOUT = {
-  front: { x: 1, width: 71, oneLineY: 5, line1Y: 1, line2Y: 9, font1: 'small', accentHeight: 16 },
+  front: { x: 1, width: 71, oneLineY: 4, line1Y: 0, line2Y: 8, font1: 'small', accentHeight: 16 },
   back: { x: 6, width: 138, oneLineY: 34, line1Y: 24, line2Y: 46, font1: 'bold', accentHeight: 80 },
 } as const;
 

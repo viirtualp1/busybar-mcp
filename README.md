@@ -46,6 +46,10 @@ Then plug the Bar in over USB, or enter its Wi-Fi IP when asked.
 
 Works on both screens: the front colour strip and the back greyscale panel.
 
+**Answer-ready notifications.** When Claude Code or Codex finishes an answer, the Bar shows a short summary of it,
+blinks and chimes; Claude Code also shows when it is waiting for your permission. Turn it off with
+`npx busybar-mcp install --no-notify`.
+
 ## Settings
 
 Saved by `npx busybar-mcp install` in `~/.busybar-mcp/config.json`; environment variables override them.

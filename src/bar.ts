@@ -13,6 +13,7 @@ import { BACK, FRONT } from 'busybar-kit/device';
 import { isLowPriority } from 'busybar-kit/errors';
 import { Bitmap, parseColor, renderOnto, type Rgba } from 'busybar-kit/preview';
 import type { Display } from './media/image.js';
+import { toAscii } from './text.js';
 
 export type { Display };
 
@@ -36,6 +37,8 @@ export type Scene = {
   ledColor?: string;
   /** Draw over anything, an active BUSY work session included. */
   urgent?: boolean;
+  /** Skip the photo of the real screen after drawing; the notifier has no one to show it to. */
+  photo?: boolean;
 };
 
 export type DrawResult = {
@@ -49,7 +52,8 @@ export type DrawResult = {
 
 export type StockKind = 'images' | 'animations' | 'sounds';
 
-export const APP_NAME = 'claude';
+/** The notifier draws under its own name, so a notification never wipes what the MCP tools drew. */
+export const APP_NAME = process.env.BUSYBAR_APP || 'claude';
 
 export const SCREEN = {
   front: { width: FRONT.width, height: FRONT.height, usableWidth: FRONT.width, index: 0 },
@@ -114,10 +118,7 @@ export function rgba(color: string) {
 
 /** The fonts are printable ASCII only; anything else would show as garbage. */
 export function ascii(text: string) {
-  return text
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\x20-\x7e]/g, '?');
+  return toAscii(text);
 }
 
 export function text(id: string, value: string, opts: Partial<TextElement> = {}): TextElement {
@@ -319,7 +320,7 @@ export async function draw(scene: Scene): Promise<DrawResult> {
     shown[display] = elements.map((element) => element.id);
     synced = true;
 
-    return { sent: true, preview: png, actual: await settledScreenshot(display) };
+    return { sent: true, preview: png, actual: scene.photo === false ? undefined : await settledScreenshot(display) };
   } catch (err) {
     const error = isLowPriority(err)
       ? 'the Bar is showing something more important (an active BUSY work session or another app), so nothing was drawn. Retry with urgent: true only if the user asked to interrupt it'
