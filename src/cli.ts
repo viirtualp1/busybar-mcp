@@ -20,7 +20,7 @@ import {
   uninstallClaudeHooks,
   uninstallCodexNotify,
 } from './install/hooks.js';
-import { hasSkill, installSkills, uninstallSkills } from './install/skill.js';
+import { hasSkill, installSkills, uninstallSkills, SKILL } from './install/skill.js';
 import { notify } from './notify.js';
 import { applySettings, HOME_DIR, readSettings, SERVER_FILE, SETTINGS_FILE, writeSettings, type Settings } from './settings.js';
 import { VERSION } from './version.js';
@@ -225,11 +225,21 @@ async function uninstall(flags: Flags) {
 
   for (const client of flags.only ? targets(flags.only) : CLIENTS) {
     outcomes.push(await client.uninstall());
+
+    if (client.id === 'claude-code') {
+      outcomes.push(uninstallClaudeHooks(), ...uninstallSkills('claude'));
+    }
+
+    if (client.id === 'codex') {
+      outcomes.push(uninstallCodexNotify(), ...uninstallSkills('codex'));
+    }
   }
 
-  outcomes.push(uninstallClaudeHooks(), uninstallCodexNotify(), ...uninstallSkills());
-  rmSync(HOME_DIR, { recursive: true, force: true });
-  outcomes.push({ client: 'Files', ok: true, detail: `removed ${HOME_DIR}` });
+  // With --only, the other clients still run the server copy and read the settings.
+  if (!flags.only) {
+    rmSync(HOME_DIR, { recursive: true, force: true });
+    outcomes.push({ client: 'Files', ok: true, detail: `removed ${HOME_DIR}` });
+  }
 
   console.log('Uninstalled:');
   print(outcomes);
@@ -274,6 +284,9 @@ async function main() {
         break;
       case 'doctor':
         await doctor();
+        break;
+      case 'skill':
+        process.stdout.write(SKILL);
         break;
       case 'notify':
         applySettings();

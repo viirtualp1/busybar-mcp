@@ -72,16 +72,11 @@ const REACH_HINT =
   'Check the Bar is on and plugged in over USB (or on the same Wi-Fi). On macOS 15+, the app running this ' +
   '(Claude, ChatGPT/Codex) also needs System Settings → Privacy & Security → Local Network turned on.';
 
-const { bar: config, warnings } = loadBarConfig();
+let { bar: config, warnings } = loadBarConfig();
 
 const dryRun = process.env.BUSYBAR_DRY_RUN === '1';
 
-const client = new BusyBar({
-  addr: config.busyAddr,
-  token: config.busyToken || undefined,
-  HTTPAccessPassword: config.busyHttpPassword || undefined,
-  timeout: 10_000,
-});
+let client = makeClient();
 
 /** Element ids this process put on each display, so drawing one display leaves the other alone. */
 const shown: Record<Display, string[]> = { front: [], back: [] };
@@ -92,6 +87,26 @@ let synced = false;
 const uploaded = new Set<string>();
 
 const stockCache = new Map<StockKind, string[]>();
+
+function makeClient() {
+  return new BusyBar({
+    addr: config.busyAddr,
+    token: config.busyToken || undefined,
+    HTTPAccessPassword: config.busyHttpPassword || undefined,
+    timeout: 10_000,
+  });
+}
+
+/** Points the running server at another Bar (after `env` changed), forgetting what it knew about the old one. */
+export function reconnect() {
+  ({ bar: config, warnings } = loadBarConfig());
+  client = makeClient();
+  shown.front = [];
+  shown.back = [];
+  synced = false;
+  uploaded.clear();
+  stockCache.clear();
+}
 
 export function connectionInfo() {
   return { addr: config.busyAddr, cloud: config.isCloud, dryRun, warnings };

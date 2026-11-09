@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Outcome } from './clients.js';
 
-const SKILL = `---
+export const SKILL = `---
 name: busybar
 description: Show things on the user's BUSY Bar (an LED status display with a 72x16 colour front and a 160x80 greyscale back) and play sounds on it, through the busybar MCP tools. Use whenever the user mentions the Bar, BUSY Bar, busybar, their status display, or asks to show, draw, display, notify or play something "on the bar".
 ---
@@ -41,8 +41,10 @@ export function installSkills(only?: 'codex' | 'claude'): Outcome[] {
   });
 }
 
-export function uninstallSkills(): Outcome[] {
-  return TARGETS.map(({ client, dir }) => {
+export function uninstallSkills(only?: 'codex' | 'claude'): Outcome[] {
+  const chosen = only ? [TARGETS[only === 'codex' ? 0 : 1]] : TARGETS;
+
+  return chosen.map(({ client, dir }) => {
     const existed = existsSync(dir);
     rmSync(dir, { recursive: true, force: true });
 

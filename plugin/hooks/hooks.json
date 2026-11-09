@@ -1,0 +1,27 @@
+{
+  "description": "Answer-ready notifications on the BUSY Bar",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/server.mjs\" notify --client claude",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/server.mjs\" notify --client claude",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

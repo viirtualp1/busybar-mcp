@@ -9,6 +9,7 @@ import {
   draw,
   listStock,
   playSound,
+  reconnect,
   rect,
   SCREEN,
   screenshot,
@@ -22,6 +23,7 @@ import {
 } from './bar.js';
 import { prepareImage } from './media/image.js';
 import { audioToSnd, MAX_SECONDS, melodyToSnd } from './media/sound.js';
+import { readSettings, writeSettings } from './settings.js';
 import { ciScene, inbox, inboxScene, latestCi } from './services/github.js';
 import { weather, weatherScene } from './services/weather.js';
 import { VERSION } from './version.js';
@@ -412,6 +414,38 @@ server.registerTool(
       return { content: [image(await screenshot(where))] };
     } catch (err) {
       return failure(err);
+    }
+  },
+);
+
+server.registerTool(
+  'bar_connect',
+  {
+    title: 'Connect to a Bar',
+    description:
+      'Point the server at a BUSY Bar and remember it: an IP on the Wi-Fi (shown in the Bar\'s Settings → Wi-Fi), ' +
+      '10.0.4.20 over USB, or https://api.busy.app with a cloud token. Use when the user tells you where their Bar is, ' +
+      'or when tools report the Bar cannot be reached and the user gives a new address.',
+    inputSchema: {
+      addr: z.string().min(1),
+      password: z.string().optional().describe('HTTP access password, if the Bar has one'),
+      token: z.string().optional().describe('Cloud token from cloud.busy.app/api-tokens'),
+    },
+  },
+  async ({ addr, password, token }) => {
+    const next = { ...readSettings(), BUSY_ADDR: addr, BUSY_HTTP_PASSWORD: password, BUSY_TOKEN: token };
+
+    writeSettings(next);
+    process.env.BUSY_ADDR = addr;
+    process.env.BUSY_HTTP_PASSWORD = password ?? '';
+    process.env.BUSY_TOKEN = token ?? '';
+    reconnect();
+
+    try {
+      const system = await status();
+      return result({ saved: true, addr, reachable: true, firmware: system.firmware?.version });
+    } catch (err) {
+      return result({ saved: true, addr, reachable: false, error: describe(err) });
     }
   },
 );

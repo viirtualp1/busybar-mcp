@@ -41,6 +41,9 @@ jobs:
 
       - run: npm run build
 
+      - name: Plugin is up to date
+        run: git diff --exit-code -- plugin .claude-plugin ':!plugin/.claude-plugin/icon.png' || (echo '::error::plugin/ is stale: run npm run build and commit' && exit 1)
+
       - name: Smoke test
         run: BUSYBAR_DRY_RUN=1 npm run smoke
 

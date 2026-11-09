@@ -70,6 +70,7 @@ const manifest = {
     { name: 'bar_stock', description: 'List built-in images, animations and sounds' },
     { name: 'bar_clear', description: 'Give the screen back to the Bar' },
     { name: 'bar_screenshot', description: 'See what the screen shows now' },
+    { name: 'bar_connect', description: 'Point the server at your Bar and remember it' },
     { name: 'bar_status', description: 'Which Bar, and whether it answers' },
     { name: 'github_ci', description: 'Latest GitHub Actions run for a repo' },
     { name: 'github_inbox', description: 'Review requests, your PRs, assigned issues' },
@@ -151,4 +152,92 @@ execFileSync('npx', ['mcpb', 'validate', join(stage, 'manifest.json')], { stdio:
 execFileSync('npx', ['mcpb', 'pack', stage, join(out, 'busybar.mcpb')], { stdio: 'inherit' });
 
 rmSync(stage, { recursive: true, force: true });
-console.log(`\nbuild/server.mjs and build/busybar.mcpb for ${pkg.version}`);
+
+// The Claude Code plugin is committed, because plugins install straight from the git repo.
+const plugin = 'plugin';
+const pluginServer = '${CLAUDE_PLUGIN_ROOT}/server.mjs';
+const notifyCommand = `node "${pluginServer}" notify --client claude`;
+
+rmSync(plugin, { recursive: true, force: true });
+mkdirSync(join(plugin, '.claude-plugin'), { recursive: true });
+mkdirSync(join(plugin, 'hooks'), { recursive: true });
+mkdirSync(join(plugin, 'skills', 'busybar'), { recursive: true });
+
+copyFileSync(join(out, 'server.mjs'), join(plugin, 'server.mjs'));
+copyFileSync('LICENSE', join(plugin, 'LICENSE'));
+writeFileSync(join(plugin, '.claude-plugin', 'icon.png'), icon());
+writeFileSync(
+  join(plugin, 'skills', 'busybar', 'SKILL.md'),
+  execFileSync('node', [join(out, 'server.mjs'), 'skill'], { encoding: 'utf8' }),
+);
+
+const pluginManifest = {
+  name: 'busybar',
+  version: pkg.version,
+  description:
+    'Draw, show pictures and play sounds on your BUSY Bar, and see a summary of every answer on it when Claude finishes.',
+  author: { name: 'viirtualp1', url: 'https://github.com/viirtualp1' },
+  homepage: 'https://github.com/viirtualp1/busybar-mcp',
+  repository: 'https://github.com/viirtualp1/busybar-mcp',
+  license: 'MIT',
+  keywords: ['busy-bar', 'led', 'status', 'notifications'],
+  userConfig: {
+    BUSY_ADDR: {
+      type: 'string',
+      title: 'BUSY Bar address',
+      description: 'IP on your Wi-Fi, 10.0.4.20 over USB, or https://api.busy.app with a cloud token. Empty: USB.',
+      default: '',
+    },
+    BUSY_HTTP_PASSWORD: {
+      type: 'string',
+      title: 'HTTP access password',
+      description: 'Only if the Bar has HTTP access locked.',
+      default: '',
+      sensitive: true,
+    },
+    BUSY_TOKEN: {
+      type: 'string',
+      title: 'BUSY cloud token',
+      description: 'From cloud.busy.app/api-tokens, to reach the Bar from anywhere.',
+      default: '',
+      sensitive: true,
+    },
+    GITHUB_TOKEN: {
+      type: 'string',
+      title: 'GitHub token',
+      description: 'For the GitHub tools. Empty: uses `gh auth token` if the GitHub CLI is logged in.',
+      default: '',
+      sensitive: true,
+    },
+    NOTIFY: {
+      type: 'boolean',
+      title: 'Answer-ready notifications',
+      description: 'Show a short summary on the Bar when Claude finishes an answer or waits for you.',
+      default: true,
+    },
+    NOTIFY_SOUND: {
+      type: 'boolean',
+      title: 'Notification chime',
+      description: 'Play a short chime with each notification.',
+      default: true,
+    },
+  },
+};
+
+const hookEntry = [{ hooks: [{ type: 'command', command: notifyCommand, timeout: 20 }] }];
+
+writeFileSync(join(plugin, '.claude-plugin', 'plugin.json'), `${JSON.stringify(pluginManifest, null, 2)}\n`);
+writeFileSync(
+  join(plugin, '.mcp.json'),
+  `${JSON.stringify({ mcpServers: { busybar: { command: 'node', args: [pluginServer] } } }, null, 2)}\n`,
+);
+writeFileSync(
+  join(plugin, 'hooks', 'hooks.json'),
+  `${JSON.stringify({ description: 'Answer-ready notifications on the BUSY Bar', hooks: { Stop: hookEntry, Notification: hookEntry } }, null, 2)}\n`,
+);
+
+const marketplace = JSON.parse(readFileSync(join('.claude-plugin', 'marketplace.json'), 'utf8'));
+marketplace.plugins[0].version = pkg.version;
+writeFileSync(join('.claude-plugin', 'marketplace.json'), `${JSON.stringify(marketplace, null, 2)}\n`);
+
+console.log(`\nbuild/server.mjs, build/busybar.mcpb and plugin/ for ${pkg.version}`);

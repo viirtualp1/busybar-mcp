@@ -46,7 +46,8 @@ export function writeSettings(settings: Settings) {
 }
 
 /**
- * Fills env from ~/.busybar-mcp/config.json where the client left a value unset.
+ * Fills env from a Claude Code plugin option (CLAUDE_PLUGIN_OPTION_<KEY>), then from ~/.busybar-mcp/config.json,
+ * where the client left a value unset.
  * Claude Desktop passes an untouched `${user_config.x}` placeholder or an empty
  * string for optional fields, so both count as unset.
  */
@@ -54,12 +55,17 @@ export function applySettings(env: NodeJS.ProcessEnv = process.env) {
   const stored = readSettings();
 
   for (const key of SETTING_KEYS) {
-    const current = env[key];
+    const current = env[key] || env[`CLAUDE_PLUGIN_OPTION_${key}`];
     const unset = !current || /^\$\{.*\}$/.test(current);
 
-    if (unset && stored[key]) {
+    if (!unset) {
+      env[key] = current;
+      continue;
+    }
+
+    if (stored[key]) {
       env[key] = stored[key];
-    } else if (unset) {
+    } else {
       delete env[key];
     }
   }

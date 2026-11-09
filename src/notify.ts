@@ -88,7 +88,25 @@ function lastAnswer(transcriptPath: string) {
     }
   }
 
-  return parts.join('\n\n');
+  if (parts.length > 0) {
+    return parts.join('\n\n');
+  }
+
+  // Ended on a tool call (stopped, or a hook firing mid-turn): the latest thing it said is the next best summary.
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const line = JSON.parse(lines[i]) as TranscriptLine;
+      const text = line.type === 'assistant' ? textOf(line) : '';
+
+      if (text) {
+        return text;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return '';
 }
 
 function fromClaude(payload: Record<string, unknown>): Event | undefined {
@@ -189,6 +207,14 @@ async function show(event: Event) {
 
 /** Never throws and always exits 0: a hook that fails would get in the agent's way. */
 export async function notify(args: string[]) {
+  if (process.env.CLAUDE_PLUGIN_OPTION_NOTIFY === 'false') {
+    return;
+  }
+
+  if (process.env.CLAUDE_PLUGIN_OPTION_NOTIFY_SOUND === 'false') {
+    process.env.BUSYBAR_NOTIFY_SOUND = '0';
+  }
+
   const client = args[args.indexOf('--client') + 1] === 'codex' ? 'codex' : 'claude';
   const payloadArg = client === 'codex' ? args.at(-1) : undefined;
 
