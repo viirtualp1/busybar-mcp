@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
-import { rect, text, type Scene } from '../bar.js';
+import { FRONT_ROW, rect, text, type Scene } from '../bar.js';
 
 const run = promisify(execFile);
 
@@ -106,8 +106,8 @@ export function ciScene(ci: CiSummary): Scene {
     ledColor: ci.state === 'fail' ? color : undefined,
     elements: [
       rect('ci-band', 0, 0, 3, 16, color),
-      text('ci-repo', name, { x: 6, y: 1, width: 66, scroll_rate: name.length > 16 ? 600 : undefined }),
-      text('ci-state', `${CI_LABEL[ci.state]} ${ci.branch}`, { x: 6, y: 9, color, width: 66 }),
+      text('ci-repo', name, { x: 6, y: FRONT_ROW.top, width: 66, scroll_rate: name.length > 16 ? 600 : undefined }),
+      text('ci-state', `${CI_LABEL[ci.state]} ${ci.branch}`, { x: 6, y: FRONT_ROW.bottom, color, width: 66 }),
     ],
   };
 }
@@ -129,8 +129,8 @@ export async function inbox(): Promise<Inbox> {
 
 export function inboxScene(box: Inbox): Scene {
   const cell = (id: string, x: number, label: string, n: number, color: string) => [
-    text(`${id}-n`, String(n), { x, y: 1, color: n > 0 ? color : '#555555FF' }),
-    text(`${id}-l`, label, { x, y: 9, color: '#AAAAAAFF' }),
+    text(`${id}-n`, String(n), { x, y: FRONT_ROW.top, color: n > 0 ? color : '#555555FF' }),
+    text(`${id}-l`, label, { x, y: FRONT_ROW.bottom, color: '#AAAAAAFF' }),
   ];
 
   return {

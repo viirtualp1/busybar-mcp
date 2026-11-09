@@ -221,7 +221,7 @@ function forwardCodex(payloadArg: string | undefined) {
 
 /** What the notification looks like on each screen; `now` is passed in so a preview can pin the clock. */
 export async function notificationScenes(event: Event, now: Date) {
-  const { text } = await import('./bar.js');
+  const { FRONT_ROW, text } = await import('./bar.js');
   const seconds = Number(process.env.BUSYBAR_NOTIFY_SECONDS) || 300;
   const color = COLORS[event.kind];
   const logo = LOGOS[event.agent === 'Claude' ? 'claude' : 'codex'];
@@ -239,8 +239,8 @@ export async function notificationScenes(event: Event, now: Date) {
     ledColor: color,
     pixels: [{ ...logo.front, x: 0, y: 0 }],
     elements: [
-      text('title', TITLE[event.kind], { x: 18, y: 0, width: 54, color }),
-      text('where', where, { x: 18, y: 8, width: 54, color: '#BBBBBB', scroll_rate: where.length > 13 ? 900 : undefined }),
+      text('title', TITLE[event.kind], { x: 18, y: FRONT_ROW.top, width: 54, color }),
+      text('where', where, { x: 18, y: FRONT_ROW.bottom, width: 54, color: '#BBBBBB', scroll_rate: where.length > 13 ? 900 : undefined }),
     ],
   };
 
@@ -250,8 +250,8 @@ export async function notificationScenes(event: Event, now: Date) {
     timeout: seconds,
     pixels: [{ ...logo.back, x: 2, y: 4 }],
     elements: [
-      text('title', TITLE[event.kind], { x: 48, y: 4, font: 'bold' }),
-      text('time', time, { x: 145, y: 4, align: 'top_right', font: 'bold' }),
+      text('title', TITLE[event.kind], { x: 48, y: 2, font: 'bold' }),
+      text('time', time, { x: 145, y: 2, align: 'top_right', font: 'bold' }),
       text('project', project, { x: 48, y: 18, width: 97 }),
       ...(worked ? [text('worked', worked, { x: 48, y: 29, width: 97, color: '#999999' })] : []),
       ...(dayChanged ? [text('day', day(now), { x: 48, y: 40, width: 97, color: '#999999' })] : []),

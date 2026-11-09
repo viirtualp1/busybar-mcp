@@ -7,6 +7,7 @@ import {
   connectionInfo,
   describe,
   draw,
+  FRONT_ROW,
   listStock,
   playSound,
   reconnect,
@@ -50,7 +51,7 @@ const display = z
 
 /** Where text goes on each screen. The back has room for a bigger first line. */
 const LAYOUT = {
-  front: { x: 1, width: 71, oneLineY: 4, line1Y: 0, line2Y: 8, font1: 'small', accentHeight: 16 },
+  front: { x: 1, width: 71, oneLineY: FRONT_ROW.single, line1Y: FRONT_ROW.top, line2Y: FRONT_ROW.bottom, font1: 'small', accentHeight: 16 },
   back: { x: 6, width: 138, oneLineY: 34, line1Y: 24, line2Y: 46, font1: 'bold', accentHeight: 80 },
 } as const;
 
@@ -107,7 +108,7 @@ function caption(id: string, value: string, where: Display, x: number, colour?: 
 
   return text(id, value, {
     x,
-    y: where === 'front' ? 5 : 36,
+    y: where === 'front' ? FRONT_ROW.single : 36,
     width: Math.max(1, screen.usableWidth - x - 1),
     color: colour,
     scroll_rate: value.length * 4 > screen.usableWidth - x ? 900 : undefined,

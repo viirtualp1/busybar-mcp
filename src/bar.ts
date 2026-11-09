@@ -68,6 +68,15 @@ const OFF: Record<Display, Rgba> = {
   back: { r: 0, g: 0, b: 0, a: 255 },
 };
 
+/**
+ * Text rows on the 16px front strip. The device fonts draw capitals 2px below `y` (1px for tiny), 5px tall, with
+ * descenders 3px under them: two lines at -1 and 8 leave 1px above the first capitals and 1px below the second.
+ */
+export const FRONT_ROW = { single: 4, top: -1, bottom: 8 } as const;
+
+/** Where the device fonts start their capitals below `y`; the preview's own font starts at `y`, so it shifts by this. */
+const CAP_TOP: Partial<Record<string, number>> = { tiny: 1 };
+
 const PREVIEW_SCALE: Record<Display, number> = { front: 10, back: 4 };
 
 const REACH_HINT =
@@ -268,7 +277,11 @@ export function preview(scene: Scene) {
     });
   }
 
-  renderOnto(bitmap, withDisplay.filter((e) => e.type === 'text'), display);
+  const texts = withDisplay
+    .filter((e) => e.type === 'text')
+    .map((e) => ({ ...e, y: (e.y ?? 0) + (CAP_TOP[e.font] ?? 2) }));
+
+  renderOnto(bitmap, texts, display);
 
   return bitmap.scale(PREVIEW_SCALE[display]).toPng();
 }

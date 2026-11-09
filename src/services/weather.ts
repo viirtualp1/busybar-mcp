@@ -1,4 +1,4 @@
-import { text, type PixelArt, type Scene } from '../bar.js';
+import { FRONT_ROW, text, type PixelArt, type Scene } from '../bar.js';
 
 // Open-Meteo: free, no key.
 
@@ -128,9 +128,9 @@ export function weatherScene(w: Weather): Scene {
   return {
     pixels: [weatherIcon(w.kind)],
     elements: [
-      text('w-temp', temp, { x: 16, y: 1, color: tempColor }),
-      text('w-place', w.place, { x: 16 + temp.length * 4 + 3, y: 1, color: '#AAAAAAFF', width: 72 - (16 + temp.length * 4 + 3) }),
-      text('w-range', `${w.minC}..${w.maxC} ${w.windKmh}kmh`, { x: 16, y: 9, color: '#AAAAAAFF', width: 56 }),
+      text('w-temp', temp, { x: 16, y: FRONT_ROW.top, color: tempColor }),
+      text('w-place', w.place, { x: 16 + temp.length * 4 + 3, y: FRONT_ROW.top, color: '#AAAAAAFF', width: 72 - (16 + temp.length * 4 + 3) }),
+      text('w-range', `${w.minC}..${w.maxC} ${w.windKmh}kmh`, { x: 16, y: FRONT_ROW.bottom, color: '#AAAAAAFF', width: 56 }),
     ],
   };
 }
