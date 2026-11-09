@@ -2,7 +2,7 @@
 //   build/server.mjs   one-file server + CLI (the npm bin, and what clients run)
 //   build/busybar.mcpb Claude Desktop extension (double-click to install)
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import { Bitmap, parseColor } from 'busybar-kit/preview';
@@ -254,4 +254,98 @@ const marketplace = JSON.parse(readFileSync(join('.claude-plugin', 'marketplace.
 marketplace.plugins[0].version = pkg.version;
 writeFileSync(join('.claude-plugin', 'marketplace.json'), `${JSON.stringify(marketplace, null, 2)}\n`);
 
-console.log(`\nbuild/server.mjs, build/busybar.mcpb and plugin/ for ${pkg.version}`);
+// The same folder is a Codex plugin too: Codex reads .codex-plugin/ and its own MCP file, and shares the server and
+// the skill with Claude Code. Codex starts the server from the app, without the shell's PATH, so a launcher finds Node.
+const LAUNCH_SH = `#!/bin/sh
+# Starts the BUSY Bar MCP server with the first Node it can find. Codex runs plugins from its app, which does not
+# see the PATH a terminal has (nvm, Homebrew), so look where Codex and the usual installers keep Node.
+here=$(cd "$(dirname "$0")" && pwd)
+
+for node in \\
+  "\${CODEX_MCP_NODE_PATH:-}" \\
+  "\${CODEX_ELECTRON_RESOURCES_PATH:+\${CODEX_ELECTRON_RESOURCES_PATH}/cua_node/bin/node}" \\
+  "\${XDG_CACHE_HOME:-\${HOME}/.cache}/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node" \\
+  "$(command -v node 2>/dev/null)" \\
+  /opt/homebrew/bin/node \\
+  /usr/local/bin/node \\
+  $(ls -d "\${HOME}"/.nvm/versions/node/*/bin/node 2>/dev/null | sort -V -r) \\
+  /Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node
+do
+  if [ -n "$node" ] && [ -x "$node" ]; then
+    exec "$node" "$here/server.mjs" "$@"
+  fi
+done
+
+echo 'BUSY Bar: Node.js was not found. Install it from https://nodejs.org and restart Codex.' >&2
+exit 127
+`;
+
+const LAUNCH_CMD = `@echo off\r
+rem Starts the BUSY Bar MCP server with the Node that Codex or the system provides.\r
+if defined CODEX_MCP_NODE_PATH if exist "%CODEX_MCP_NODE_PATH%" ("%CODEX_MCP_NODE_PATH%" "%~dp0server.mjs" %* & exit /b)\r
+where node >nul 2>nul && (node "%~dp0server.mjs" %* & exit /b)\r
+echo BUSY Bar: Node.js was not found. Install it from https://nodejs.org and restart Codex. 1>&2\r
+exit /b 127\r
+`;
+
+const codexManifest = {
+  name: 'busybar',
+  version: pkg.version,
+  description: pluginManifest.description,
+  author: { name: 'viirtualp1', url: 'https://github.com/viirtualp1' },
+  homepage: 'https://github.com/viirtualp1/busybar-mcp',
+  repository: 'https://github.com/viirtualp1/busybar-mcp',
+  license: 'MIT',
+  keywords: pluginManifest.keywords,
+  skills: './skills/',
+  mcpServers: './.codex-mcp.json',
+  interface: {
+    displayName: 'BUSY Bar',
+    shortDescription: 'Your status, timers and notes on a BUSY Bar',
+    longDescription:
+      'Ask Codex to set your status, start a focus timer, show text, pictures or the weather, and play sounds on your ' +
+      'BUSY Bar. Plug it in with USB or keep it on the same Wi-Fi: it is found automatically. Unofficial, not ' +
+      'affiliated with Flipper Devices / BUSY.',
+    developerName: 'viirtualp1',
+    category: 'Productivity',
+    capabilities: ['Interactive', 'Write'],
+    websiteURL: 'https://github.com/viirtualp1/busybar-mcp',
+    defaultPrompt: ['Start a 25-minute focus timer on my BUSY Bar'],
+    brandColor: '#D97757',
+    composerIcon: './.claude-plugin/icon.png',
+    logo: './.claude-plugin/icon.png',
+  },
+};
+
+mkdirSync(join(plugin, '.codex-plugin'), { recursive: true });
+writeFileSync(join(plugin, '.codex-plugin', 'plugin.json'), `${JSON.stringify(codexManifest, null, 2)}\n`);
+writeFileSync(
+  join(plugin, '.codex-mcp.json'),
+  `${JSON.stringify({ mcpServers: { busybar: { command: './launch', args: [], cwd: '.' } } }, null, 2)}\n`,
+);
+writeFileSync(join(plugin, 'launch'), LAUNCH_SH, { mode: 0o755 });
+chmodSync(join(plugin, 'launch'), 0o755);
+writeFileSync(join(plugin, 'launch.cmd'), LAUNCH_CMD);
+
+mkdirSync(join('.agents', 'plugins'), { recursive: true });
+writeFileSync(
+  join('.agents', 'plugins', 'marketplace.json'),
+  `${JSON.stringify(
+    {
+      name: 'busybar',
+      interface: { displayName: 'BUSY Bar' },
+      plugins: [
+        {
+          name: 'busybar',
+          source: { source: 'local', path: './plugin' },
+          policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+          category: 'Productivity',
+        },
+      ],
+    },
+    null,
+    2,
+  )}\n`,
+);
+
+console.log(`\nbuild/server.mjs, build/busybar.mcpb and plugin/ (Claude Code + Codex) for ${pkg.version}`);

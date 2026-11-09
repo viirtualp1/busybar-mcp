@@ -1,0 +1,22 @@
+#!/bin/sh
+# Starts the BUSY Bar MCP server with the first Node it can find. Codex runs plugins from its app, which does not
+# see the PATH a terminal has (nvm, Homebrew), so look where Codex and the usual installers keep Node.
+here=$(cd "$(dirname "$0")" && pwd)
+
+for node in \
+  "${CODEX_MCP_NODE_PATH:-}" \
+  "${CODEX_ELECTRON_RESOURCES_PATH:+${CODEX_ELECTRON_RESOURCES_PATH}/cua_node/bin/node}" \
+  "${XDG_CACHE_HOME:-${HOME}/.cache}/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node" \
+  "$(command -v node 2>/dev/null)" \
+  /opt/homebrew/bin/node \
+  /usr/local/bin/node \
+  $(ls -d "${HOME}"/.nvm/versions/node/*/bin/node 2>/dev/null | sort -V -r) \
+  /Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node
+do
+  if [ -n "$node" ] && [ -x "$node" ]; then
+    exec "$node" "$here/server.mjs" "$@"
+  fi
+done
+
+echo 'BUSY Bar: Node.js was not found. Install it from https://nodejs.org and restart Codex.' >&2
+exit 127

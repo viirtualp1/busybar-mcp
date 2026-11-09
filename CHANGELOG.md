@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0
+
+- A Codex plugin, from the same repository as the Claude Code one: `codex plugin marketplace add viirtualp1/busybar-mcp`,
+  then `codex plugin add busybar@busybar`. No installer, no edits to your Codex config, updates through Codex.
+- It starts even when Node is not on the app's PATH: the launcher uses the Node that Codex ships with, then the usual
+  places (Homebrew, nvm).
+
 ## 0.11.0
 
 - Made for everyone, not just developers: plug the Bar in or keep it on the same Wi-Fi, and Claude finds it by itself.

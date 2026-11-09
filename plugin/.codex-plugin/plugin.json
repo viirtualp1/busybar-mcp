@@ -1,0 +1,38 @@
+{
+  "name": "busybar",
+  "version": "0.12.0",
+  "description": "Draw, show pictures and play sounds on your BUSY Bar.",
+  "author": {
+    "name": "viirtualp1",
+    "url": "https://github.com/viirtualp1"
+  },
+  "homepage": "https://github.com/viirtualp1/busybar-mcp",
+  "repository": "https://github.com/viirtualp1/busybar-mcp",
+  "license": "MIT",
+  "keywords": [
+    "busy-bar",
+    "led",
+    "status",
+    "notifications"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.codex-mcp.json",
+  "interface": {
+    "displayName": "BUSY Bar",
+    "shortDescription": "Your status, timers and notes on a BUSY Bar",
+    "longDescription": "Ask Codex to set your status, start a focus timer, show text, pictures or the weather, and play sounds on your BUSY Bar. Plug it in with USB or keep it on the same Wi-Fi: it is found automatically. Unofficial, not affiliated with Flipper Devices / BUSY.",
+    "developerName": "viirtualp1",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/viirtualp1/busybar-mcp",
+    "defaultPrompt": [
+      "Start a 25-minute focus timer on my BUSY Bar"
+    ],
+    "brandColor": "#D97757",
+    "composerIcon": "./.claude-plugin/icon.png",
+    "logo": "./.claude-plugin/icon.png"
+  }
+}

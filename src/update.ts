@@ -44,6 +44,11 @@ export function updateHow(url: string) {
     return 'in Claude Code run /plugin update busybar';
   }
 
+  // Codex installs plugins into <CODEX_HOME>/plugins/cache/<marketplace>/<plugin>/<version>.
+  if (/[\\/]plugins[\\/]cache[\\/]busybar[\\/]busybar[\\/]/.test(process.argv[1] ?? '')) {
+    return 'run `codex plugin marketplace upgrade busybar` and `codex plugin add busybar@busybar` in a terminal, then start a new Codex chat';
+  }
+
   if (process.argv[1]?.includes('Claude Extensions')) {
     return `download busybar.mcpb from ${url} and double-click it`;
   }

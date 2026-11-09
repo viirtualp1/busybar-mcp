@@ -22,7 +22,14 @@ On a Mac, the first time, allow Claude to see devices on your network:
 
 **Claude Code:** type `/plugin install busybar --marketplace viirtualp1/busybar-mcp`
 
-**Codex:** run `npx busybar-mcp install --yes` in a terminal.
+**Codex:** run these two in a terminal, then start a new chat:
+
+```bash
+codex plugin marketplace add viirtualp1/busybar-mcp
+codex plugin add busybar@busybar
+```
+
+Older Codex without plugins: `npx busybar-mcp install --yes`.
 </details>
 
 ## Try saying
@@ -54,7 +61,7 @@ Ask Claude *"set up my BUSY Bar"*: it checks the connection and walks you throug
 
 When a new version is out, Claude tells you in your next conversation and how to get it: download the new
 `busybar.mcpb` and double-click it (Claude app), `/plugin update busybar` (Claude Code), or
-`npx busybar-mcp@latest update` (Codex). What changed is in the [changelog](./CHANGELOG.md).
+`codex plugin marketplace upgrade busybar` then `codex plugin add busybar@busybar` (Codex). What changed is in the [changelog](./CHANGELOG.md).
 
 ---
 
@@ -132,7 +139,7 @@ overlay at a time. Diagnostics are forwarded to the device without claiming the 
 
 ```bash
 npm install
-npm run build                     # build/server.mjs, build/busybar.mcpb, plugin/
+npm run build                     # build/server.mjs, build/busybar.mcpb, plugin/ (Claude Code + Codex)
 npm test                          # stdio tool tests against mocked HTTP responses
 BUSYBAR_DRY_RUN=1 npm run smoke   # preview smoke checks
 npm run live                      # media tools on a real Bar
