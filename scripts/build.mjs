@@ -35,7 +35,7 @@ const manifest = {
   name: 'busybar',
   display_name: 'BUSY Bar',
   version: pkg.version,
-  description: 'Let Claude draw on your BUSY Bar: status text, pixel art, progress, GitHub and weather.',
+  description: 'Let Claude draw and play sounds on your BUSY Bar: text, pixel art, pictures, animations, melodies, GitHub and weather, on both screens.',
   long_description:
     'Unofficial community extension, not affiliated with Flipper Devices / BUSY.\n\n' +
     'Every drawing tool returns a preview image, so Claude sees what it drew. ' +
@@ -64,6 +64,10 @@ const manifest = {
     { name: 'bar_text', description: 'Show one or two lines of text' },
     { name: 'bar_pixels', description: 'Draw pixel art from a palette and a grid' },
     { name: 'bar_progress', description: 'Show a labelled progress bar' },
+    { name: 'bar_image', description: 'Show a picture from a file, a URL or the Bar\'s stock' },
+    { name: 'bar_animation', description: 'Play a stock animation' },
+    { name: 'bar_sound', description: 'Play a stock sound, an audio file or a melody' },
+    { name: 'bar_stock', description: 'List built-in images, animations and sounds' },
     { name: 'bar_clear', description: 'Give the screen back to the Bar' },
     { name: 'bar_screenshot', description: 'See what the screen shows now' },
     { name: 'bar_status', description: 'Which Bar, and whether it answers' },

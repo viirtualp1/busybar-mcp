@@ -3,8 +3,8 @@
 > [!IMPORTANT]
 > **Unofficial community project**, not affiliated with Flipper Devices / BUSY. "BUSY Bar" is their trademark.
 
-An MCP server that lets Claude (Desktop, Code) and Codex draw on a [BUSY Bar](https://busy.app/):
-status text, pixel art, progress bars, your GitHub CI and inbox, the weather.
+An MCP server that lets Claude (Desktop, Code) and Codex draw and play sounds on a [BUSY Bar](https://busy.app/):
+status text, pixel art, pictures, animations, melodies, your GitHub CI and inbox, the weather — on both screens.
 
 Every drawing tool returns a preview image, so the model sees what it drew and can fix it.
 
@@ -52,12 +52,27 @@ Unattended: `npx busybar-mcp install --yes --addr 192.168.1.50 --only claude-cod
 | `bar_text` | one or two lines, optional accent band and LED blink |
 | `bar_pixels` | pixel art from a palette and a character grid, optional caption |
 | `bar_progress` | labelled progress bar |
-| `bar_clear` | give the screen back to the Bar |
-| `bar_screenshot` | what the screen shows right now |
+| `bar_image` | a picture from a path or URL (PNG; JPEG, GIF, HEIC, WebP on macOS), or a stock image |
+| `bar_animation` | one of the Bar's stock animations (`coding_72x16.anim`, `on_air_72x16.anim`, …) |
+| `bar_sound` | a stock sound, an audio file (WAV; MP3, M4A, AIFF on macOS or with ffmpeg), or a melody |
+| `bar_stock` | the images, animations and sounds built into the Bar |
+| `bar_clear` | give one screen, or both, back to the Bar |
+| `bar_screenshot` | what a screen shows right now |
 | `bar_status` | which Bar, and whether it answers |
 | `github_ci` | latest Actions run for `owner/repo` |
 | `github_inbox` | review requests, your open PRs, issues assigned to you |
 | `weather` | current weather for a city (Open-Meteo, no key) |
+
+Every drawing tool takes `display: "front" | "back"`. The front is the 72×16 colour strip people see; the back is the
+160×80 greyscale OLED facing you. Pictures and pixel art are dithered to its 16 greys. Drawing on one screen leaves
+the other alone.
+
+After a draw the tool returns a photo of the real screen; with no Bar (or in a dry run), a preview.
+
+Pictures are scaled to fit and uploaded once (they are named by content). Melodies are written as notes:
+`"C5:150 E5:150 G5:150 C6:400"`, `R` for a rest, `C4+E4+G4:500` for a chord, in a square, sine, triangle or saw
+voice. Sounds are converted to the Bar's `.snd` (mono 16-bit PCM, 44.1 kHz) in the server. Custom animations are
+not supported: `.anim` is a closed format.
 
 Calendar, mail and the rest come from the client's own connectors: ask "show my next meeting on the Bar" and the model
 reads your calendar and calls `bar_text`.
@@ -84,6 +99,7 @@ Environment variables win over `~/.busybar-mcp/config.json`.
 npm install
 npm run build                     # build/server.mjs + build/busybar.mcpb
 BUSYBAR_DRY_RUN=1 npm run smoke   # call every tool, write preview-*.png
+npm run live                      # walk through the media tools on a real Bar, write live-*.png
 npm run dev -- install --only codex
 ```
 
