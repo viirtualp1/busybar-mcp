@@ -35,6 +35,8 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+const BACK_SUMMARY = { columns: 35, rows: 3, y: 49, lineHeight: 10 };
+
 async function readStdin() {
   if (process.stdin.isTTY) {
     return '';
@@ -230,7 +232,10 @@ export async function notificationScenes(event: Event, now: Date) {
   const project = event.project ?? event.agent;
   const where = dayChanged ? `${time} ${day(now)} ${project}` : `${time} ${project}`;
   const worked = event.startedAt && event.kind === 'ready' ? `worked ${duration(now.getTime() - event.startedAt.getTime())}` : '';
-  const gist = wrap(summarize(event.text, 70), 35, 2);
+  const { columns, rows, y, lineHeight } = BACK_SUMMARY;
+  const gist = event.kind === 'ready'
+    ? wrap(summarize(event.text, columns * rows), columns, rows)
+    : wrap(summarize(event.text, 70), columns, 2);
 
   const front: Scene = {
     display: 'front',
@@ -255,7 +260,12 @@ export async function notificationScenes(event: Event, now: Date) {
       text('project', project, { x: 48, y: 18, width: 97 }),
       ...(worked ? [text('worked', worked, { x: 48, y: 29, width: 97, color: '#999999' })] : []),
       ...(dayChanged ? [text('day', day(now), { x: 48, y: 40, width: 97, color: '#999999' })] : []),
-      ...gist.map((line, i) => text(`gist${i}`, line, { x: 4, y: 52 + i * 11, width: 141, color: '#BBBBBB' })),
+      ...gist.map((line, i) => text(`gist${i}`, line, {
+        x: 4,
+        y: event.kind === 'ready' ? y + i * lineHeight : 52 + i * 11,
+        width: 141,
+        color: '#BBBBBB',
+      })),
     ],
   };
 

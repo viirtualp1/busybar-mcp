@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+
+- The back screen shows up to three lines of the answer, with Markdown and brief opening filler removed.
+  Longer answers are shortened to fit at a sentence or word boundary.
+
 ## 0.7.0
 
 - Notifications are glanceable instead of a scrolling paragraph: the logo, **Ready** / **Needs you**, the time, the

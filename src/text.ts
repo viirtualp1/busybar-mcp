@@ -10,6 +10,8 @@ const PUNCTUATION: Record<string, string> = {
   ' ': ' ',
 };
 
+const SENTENCES = new Intl.Segmenter('en', { granularity: 'sentence' });
+
 /** The Bar's fonts are printable ASCII only: transliterate Cyrillic, flatten accents and typography, drop the rest. */
 export function toAscii(text: string) {
   const mapped = [...text]
@@ -51,22 +53,33 @@ export function summarize(answer: string, max: number) {
     .split(/\n\s*\n/)
     .map((p) => toAscii(p.replace(/\s+/g, ' ').trim()))
     .filter((p) => p.length > 0);
-  const text = paragraphs.join(' ');
+  const text = paragraphs.join(' ')
+    .replace(/^(?:(?:sure|of course|absolutely|okay|ok)[.!] +)+/i, '');
 
   if (text.length <= max) {
     return text;
   }
 
-  const head = text.slice(0, max);
-  const sentenceEnd = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '));
+  let sentenceEnd = 0;
 
-  if (sentenceEnd > max * 0.4) {
-    return head.slice(0, sentenceEnd + 1);
+  for (const { index, segment } of SENTENCES.segment(text)) {
+    const end = index + segment.trimEnd().length;
+
+    if (end > max) {
+      break;
+    }
+
+    sentenceEnd = end;
   }
 
+  if (sentenceEnd > max * 0.4) {
+    return text.slice(0, sentenceEnd);
+  }
+
+  const head = text.slice(0, max - 3);
   const wordEnd = head.lastIndexOf(' ');
 
-  return `${head.slice(0, wordEnd > 0 ? wordEnd : max - 3).trimEnd()}...`;
+  return `${(wordEnd > 0 ? head.slice(0, wordEnd) : head).trimEnd()}...`;
 }
 
 /** Greedy word wrap into at most `lines` lines of `width` characters. */
@@ -86,19 +99,19 @@ export function wrap(text: string, width: number, lines: number) {
       out.push(line);
     }
 
-    line = word.length > width ? `${word.slice(0, width - 1)}-` : word;
-
     if (out.length === lines) {
-      break;
+      const last = out[lines - 1].replace(/\.{3}$/, '');
+      const fitting = last.length <= width - 3 ? last : last.slice(0, width - 3).replace(/\s+\S*$/, '');
+      out[lines - 1] = `${fitting.trimEnd()}...`;
+
+      return out;
     }
+
+    line = word.length > width ? `${word.slice(0, width - 3)}...` : word;
   }
 
   if (line && out.length < lines) {
     out.push(line);
-  }
-
-  if (out.length === lines && out.join(' ').length < text.length) {
-    out[lines - 1] = `${out[lines - 1].slice(0, width - 3).trimEnd()}...`;
   }
 
   return out;
