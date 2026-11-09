@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      # Upload busybar.mcpb to the GitHub release.
+      contents: write
+      # npm trusted publishing (OIDC) and provenance.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing requires npm >= 11.5.1.
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+
+      - name: Verify tag matches package.json version
+        run: |
+          pkg_version="$(node -p "require('./package.json').version")"
+          if [ "$pkg_version" != "${GITHUB_REF_NAME#v}" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $pkg_version"
+            exit 1
+          fi
+
+      - run: npm run typecheck
+
+      - run: npm run build
+
+      - name: Smoke test
+        run: BUSYBAR_DRY_RUN=1 npm run smoke
+
+      - name: GitHub release with the Desktop extension
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" build/busybar.mcpb --title "$GITHUB_REF_NAME" --generate-notes
+
+      # No NODE_AUTH_TOKEN: auth comes from the OIDC trusted publisher
+      # configured at npmjs.com -> package -> Settings -> Access.
+      - run: npm publish --access public

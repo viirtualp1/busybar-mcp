@@ -6,6 +6,7 @@ import {
   type XpmBitmapElement,
 } from '@busy-app/busy-lib';
 import { loadBarConfig } from 'busybar-kit/config';
+import { isLowPriority } from 'busybar-kit/errors';
 import { FRONT } from 'busybar-kit/device';
 import { Bitmap, parseColor, renderOnto } from 'busybar-kit/preview';
 
@@ -23,6 +24,8 @@ export type Scene = {
   elements: Array<TextElement | RectangleElement>;
   pixels?: PixelArt[];
   ledColor?: string;
+  /** Draw over anything, an active BUSY work session included. */
+  urgent?: boolean;
 };
 
 export type DrawResult = {
@@ -46,7 +49,7 @@ export function connectionInfo() {
 }
 
 /** `#RGB`, `#RRGGBB` or `#RRGGBBAA` → `#RRGGBBAA`, which is what the device wants. */
-export function rgba(color: string): string {
+export function rgba(color: string) {
   let hex = color.trim().replace(/^#/, '');
 
   if (hex.length === 3) {
@@ -65,7 +68,7 @@ export function rgba(color: string): string {
 }
 
 /** The front font is printable ASCII only; anything else would show as garbage. */
-export function ascii(text: string): string {
+export function ascii(text: string) {
   return text
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
@@ -106,7 +109,7 @@ export function rect(id: string, x: number, y: number, width: number, height: nu
   };
 }
 
-export function validatePixels(art: PixelArt): void {
+export function validatePixels(art: PixelArt) {
   const width = Math.max(0, ...art.grid.map((row) => row.length));
   const x = art.x ?? 0;
   const y = art.y ?? 0;
@@ -195,23 +198,40 @@ export async function draw(scene: Scene): Promise<DrawResult> {
   ].map((element, i) => ({ ...element, z_index: i }));
 
   try {
-    await client.displayClear({ application_name: APP_NAME });
+    await clearOwn();
     await client.displayDraw({
       application_name: APP_NAME,
-      priority: config.drawPriority,
+      priority: scene.urgent ? 100 : config.drawPriority,
       led_notification_color: scene.ledColor ? rgba(scene.ledColor) : undefined,
       elements,
     });
 
     return { sent: true, preview: png };
   } catch (err) {
-    return { sent: false, error: describe(err), preview: png };
+    const error = isLowPriority(err)
+      ? 'the Bar is showing something more important (an active BUSY work session or another app), so nothing was drawn. Retry with urgent: true only if the user asked to interrupt it'
+      : describe(err);
+
+    return { sent: false, error, preview: png };
   }
 }
 
-export async function clear(): Promise<void> {
+export async function clear() {
   if (!dryRun) {
+    await clearOwn();
+  }
+}
+
+/** The Bar answers 400 when this app has nothing on screen, which is the state we want anyway. */
+async function clearOwn() {
+  try {
     await client.displayClear({ application_name: APP_NAME });
+  } catch (err) {
+    const nothingShown = err instanceof Error && 'status' in err && err.status === 400 && /not displaying/i.test(describe(err));
+
+    if (!nothingShown) {
+      throw err;
+    }
   }
 }
 
@@ -241,7 +261,7 @@ export async function status() {
   return client.systemStatusGet();
 }
 
-export function describe(err: unknown): string {
+export function describe(err: unknown) {
   if (err && typeof err === 'object' && 'status' in err) {
     const e = err as { status: number; message: string; body?: unknown };
     return `HTTP ${e.status}: ${e.message}${e.body ? ` ${JSON.stringify(e.body)}` : ''}`;

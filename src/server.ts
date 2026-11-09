@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -18,10 +17,16 @@ import {
 } from './bar.js';
 import { ciScene, inbox, inboxScene, latestCi } from './services/github.js';
 import { weather, weatherScene } from './services/weather.js';
+import { VERSION } from './version.js';
 
-const server = new McpServer({ name: 'busybar', version: '0.1.0' });
+const server = new McpServer({ name: 'busybar', version: VERSION });
 
 const color = z.string().describe('Hex colour, #RRGGBB');
+
+const urgent = z
+  .boolean()
+  .optional()
+  .describe('Draw over an active BUSY work session or another app. Only when the user asked to interrupt.');
 
 function image(png: Buffer) {
   return { type: 'image' as const, data: png.toString('base64'), mimeType: 'image/png' };
@@ -52,8 +57,6 @@ async function show(scene: Scene, summary: unknown = ''): Promise<CallToolResult
   return result(summary, await draw(scene));
 }
 
-// --- Drawing ---------------------------------------------------------------
-
 server.registerTool(
   'bar_text',
   {
@@ -68,15 +71,17 @@ server.registerTool(
       line2_color: color.optional(),
       accent: color.optional().describe('Draws a 3px coloured band on the left'),
       led_color: color.optional().describe('Blink the status LED in this colour'),
+      urgent,
     },
   },
-  async ({ line1, line2, color: c, line2_color, accent, led_color }) => {
+  async ({ line1, line2, color: c, line2_color, accent, led_color, urgent: force }) => {
     const x = accent ? 6 : 1;
     const width = 72 - x;
     const twoLines = line2 !== undefined;
 
     return show({
       ledColor: led_color,
+      urgent: force,
       elements: [
         ...(accent ? [rect('accent', 0, 0, 3, 16, accent)] : []),
         text('line1', line1, {
@@ -109,9 +114,10 @@ server.registerTool(
       y: z.number().int().min(0).max(15).optional(),
       caption: z.string().max(60).optional(),
       caption_color: color.optional(),
+      urgent,
     },
   },
-  async ({ palette, grid, x, y, caption, caption_color }) => {
+  async ({ palette, grid, x, y, caption, caption_color, urgent: force }) => {
     const art = { palette, grid, x, y };
 
     try {
@@ -124,6 +130,7 @@ server.registerTool(
 
     return show({
       pixels: [art],
+      urgent: force,
       elements: caption
         ? [text('caption', caption, { x: right, y: 5, width: Math.max(1, 72 - right), color: caption_color })]
         : [],
@@ -140,12 +147,14 @@ server.registerTool(
       label: z.string().max(40),
       value: z.number().min(0).max(1),
       color: color.optional(),
+      urgent,
     },
   },
-  async ({ label, value, color: c = '#2ECC71' }) => {
+  async ({ label, value, color: c = '#2ECC71', urgent: force }) => {
     const pct = `${Math.round(value * 100)}%`;
 
     return show({
+      urgent: force,
       elements: [
         text('label', label, { x: 1, y: 1, width: 70 - pct.length * 4 }),
         text('pct', pct, { x: 71 - pct.length * 4, y: 1, color: '#AAAAAAFF' }),
@@ -194,8 +203,6 @@ server.registerTool(
     }
   },
 );
-
-// --- Services --------------------------------------------------------------
 
 server.registerTool(
   'github_ci',
@@ -252,8 +259,10 @@ server.registerTool(
   },
 );
 
-await server.connect(new StdioServerTransport());
+export async function startServer() {
+  await server.connect(new StdioServerTransport());
 
-for (const warning of connectionInfo().warnings) {
-  console.error(`busybar-mcp: ${warning}`);
+  for (const warning of connectionInfo().warnings) {
+    console.error(`busybar-mcp: ${warning}`);
+  }
 }

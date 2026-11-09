@@ -9,7 +9,7 @@ const client = new Client({ name: 'smoke', version: '0' });
 await client.connect(
   new StdioClientTransport({
     command: 'npx',
-    args: ['tsx', 'src/index.ts'],
+    args: ['tsx', 'src/cli.ts'],
     env: { ...process.env } as Record<string, string>,
     stderr: 'inherit',
   }),

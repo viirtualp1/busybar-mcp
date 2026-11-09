@@ -1,29 +1,55 @@
 {
   "name": "busybar-mcp",
   "version": "0.1.0",
-  "private": true,
+  "description": "MCP server that lets Claude and Codex draw on a BUSY Bar, with a one-command installer and a Claude Desktop extension",
+  "author": "viirtualp1",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/viirtualp1/busybar-mcp.git"
+  },
+  "homepage": "https://github.com/viirtualp1/busybar-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/viirtualp1/busybar-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "busy-bar",
+    "busybar",
+    "claude",
+    "codex",
+    "led"
+  ],
   "bin": {
-    "busybar-mcp": "dist/index.js"
+    "busybar-mcp": "build/server.mjs"
+  },
+  "files": [
+    "build/server.mjs",
+    "build/server.mjs.LEGAL.txt",
+    "build/busybar.mcpb",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
   },
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
-    "smoke": "tsx scripts/smoke.ts"
-  },
-  "engines": {
-    "node": ">=22"
-  },
-  "dependencies": {
-    "@busy-app/busy-lib": "^1.0.0-rc.1",
-    "@modelcontextprotocol/sdk": "^1.32.2",
-    "busybar-kit": "file:../busybar-kit",
-    "zod": "^4.6.7"
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/cli.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "prepack": "npm run typecheck && npm run build"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
+    "@busy-app/busy-lib": "^1.0.0-rc.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/node": "^26.6.6",
+    "busybar-kit": "^2.6.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "zod": "^4.6.7"
   }
 }

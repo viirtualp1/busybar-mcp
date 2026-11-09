@@ -1,10 +1,18 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { rect, text, type Scene } from '../bar.js';
 
 const run = promisify(execFile);
 
 let cachedToken: string | undefined;
+
+/** GUI apps start servers without Homebrew on PATH, so look where gh usually lives. */
+function ghBinary() {
+  const known = ['/opt/homebrew/bin/gh', '/usr/local/bin/gh', '/usr/bin/gh'];
+
+  return known.find((path) => existsSync(path)) ?? 'gh';
+}
 
 /** GITHUB_TOKEN, or whatever `gh` is logged in with. */
 async function token(): Promise<string> {
@@ -14,7 +22,7 @@ async function token(): Promise<string> {
 
   if (!cachedToken) {
     try {
-      const { stdout } = await run('gh', ['auth', 'token']);
+      const { stdout } = await run(ghBinary(), ['auth', 'token']);
       cachedToken = stdout.trim();
     } catch {
       throw new Error('No GitHub token: set GITHUB_TOKEN or run `gh auth login`');
