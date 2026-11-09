@@ -56,7 +56,7 @@ function result(summary: unknown, drawn?: DrawResult): CallToolResult {
   if (drawn?.sent) {
     delivery = drawn.actual ? 'Shown on the BUSY Bar. The image is a photo of the real screen.' : 'Shown on the BUSY Bar.';
   } else if (drawn) {
-    delivery = drawn.error ? `NOT shown on the Bar: ${drawn.error}. The image is a preview only.` : 'Dry run: the image is a preview only.';
+    delivery = drawn.error ? `NOT shown on the Bar: ${drawn.error.replace(/\.$/, '')}. The image is a preview only.` : 'Dry run: the image is a preview only.';
   }
 
   const body = typeof summary === 'string' ? summary : JSON.stringify(summary, null, 2);

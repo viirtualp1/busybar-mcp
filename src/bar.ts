@@ -64,6 +64,10 @@ const OFF: Record<Display, Rgba> = {
 
 const PREVIEW_SCALE: Record<Display, number> = { front: 10, back: 4 };
 
+const REACH_HINT =
+  'Check the Bar is on and plugged in over USB (or on the same Wi-Fi). On macOS 15+, the app running this ' +
+  '(Claude, ChatGPT/Codex) also needs System Settings → Privacy & Security → Local Network turned on.';
+
 const { bar: config, warnings } = loadBarConfig();
 
 const dryRun = process.env.BUSYBAR_DRY_RUN === '1';
@@ -434,9 +438,17 @@ export function describe(err: unknown) {
     return `HTTP ${e.status}: ${e.message}${e.body ? ` ${JSON.stringify(e.body)}` : ''}`;
   }
 
-  if (err instanceof Error) {
-    return err.name === 'TimeoutError' ? `Bar at ${config.busyAddr} did not answer in time` : err.message;
+  if (err instanceof Error && err.name === 'TimeoutError') {
+    return `the Bar at ${config.busyAddr} did not answer in time. ${REACH_HINT}`;
   }
 
-  return String(err);
+  // Node's fetch says only "fetch failed"; the reason is in `cause`.
+  const cause = err instanceof Error && err.cause instanceof Error ? err.cause : undefined;
+
+  if (cause) {
+    const code = 'code' in cause && typeof cause.code === 'string' ? cause.code : cause.message;
+    return `cannot reach the Bar at ${config.busyAddr} (${code}). ${REACH_HINT}`;
+  }
+
+  return err instanceof Error ? err.message : String(err);
 }
