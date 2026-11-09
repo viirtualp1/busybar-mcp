@@ -194,7 +194,7 @@ writeFileSync(
 const pluginManifest = {
   name: 'busybar',
   version: pkg.version,
-  description: 'Draw, show pictures and play sounds on your BUSY Bar.',
+  description: 'Set your status, start timers, and show notes, pictures, the weather and sounds on your BUSY Bar.',
   author: { name: 'viirtualp1', url: 'https://github.com/viirtualp1' },
   homepage: 'https://github.com/viirtualp1/busybar-mcp',
   repository: 'https://github.com/viirtualp1/busybar-mcp',

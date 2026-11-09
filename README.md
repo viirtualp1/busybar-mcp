@@ -1,36 +1,42 @@
-# BUSY Bar for Claude
+# BUSY Bar for AI assistants
 
 > [!IMPORTANT]
 > Unofficial community project, not affiliated with Flipper Devices / BUSY.
 
-Talk to Claude, and your [BUSY Bar](https://busy.app/) does it: shows that you are in a meeting, counts down a focus
-session, puts up a note, a picture or the weather, plays a little melody.
+Talk to Claude or Codex, and your [BUSY Bar](https://busy.app/) does it: shows that you are in a meeting, counts
+down a focus session, puts up a note, a picture or the weather, plays a little melody.
+
+Works with the **Claude app**, **Claude Code** and **Codex**, and with any other app that supports MCP.
 
 ## Install
+
+Pick the app you use:
 
 **Claude app (Mac or Windows)**
 
 1. Download [**busybar.mcpb**](https://github.com/viirtualp1/busybar-mcp/releases/latest/download/busybar.mcpb).
 2. Double-click it and press **Install**.
-3. Plug your Bar in with its USB cable, or keep it on the same Wi-Fi as your computer. That's it: Claude finds it.
 
-On a Mac, the first time, allow Claude to see devices on your network:
-**System Settings → Privacy & Security → Local Network → Claude** (switch it on).
+**Claude Code** — type this in Claude Code:
 
-<details>
-<summary>Claude Code or Codex</summary>
+```
+/plugin install busybar --marketplace viirtualp1/busybar-mcp
+```
 
-**Claude Code:** type `/plugin install busybar --marketplace viirtualp1/busybar-mcp`
-
-**Codex:** run these two in a terminal, then start a new chat:
+**Codex** — run these two in a terminal, then start a new chat:
 
 ```bash
 codex plugin marketplace add viirtualp1/busybar-mcp
 codex plugin add busybar@busybar
 ```
 
-Older Codex without plugins: `npx busybar-mcp install --yes`.
-</details>
+<sub>Older Codex without plugins, or another MCP app: `npx busybar-mcp install --yes`.</sub>
+
+Then plug your Bar in with its USB cable, or keep it on the same Wi-Fi as your computer. That's it: your assistant
+finds it.
+
+On a Mac, the first time, allow the app to see devices on your network:
+**System Settings → Privacy & Security → Local Network** → switch on **Claude** (or **ChatGPT**, for Codex).
 
 ## Try saying
 
@@ -49,19 +55,23 @@ The front of the Bar is the colour strip other people see; the back is the scree
 
 ## If it doesn't work
 
-Ask Claude *"set up my BUSY Bar"*: it checks the connection and walks you through it. The usual fixes:
+Ask your assistant *"set up my BUSY Bar"*: it checks the connection and walks you through it. The usual fixes:
 
 - **Not found:** plug the Bar in with the USB cable, or make sure it is on and on the same Wi-Fi as your computer.
-- **On a Mac:** System Settings → Privacy & Security → **Local Network** → switch on Claude (or ChatGPT for Codex),
+- **On a Mac:** System Settings → Privacy & Security → **Local Network** → switch on Claude (or ChatGPT, for Codex),
   then restart the app.
-- **Still nothing:** the Bar shows its address under **Settings → Wi-Fi**. Tell Claude *"my Bar is at …"*.
+- **Still nothing:** the Bar shows its address under **Settings → Wi-Fi**. Say *"my Bar is at …"*.
 - **Nothing shows up during a focus session:** the Bar keeps its own session on screen. Say *"show it anyway"*.
 
 ## Updating
 
-When a new version is out, Claude tells you in your next conversation and how to get it: download the new
-`busybar.mcpb` and double-click it (Claude app), `/plugin update busybar` (Claude Code), or
-`codex plugin marketplace upgrade busybar` then `codex plugin add busybar@busybar` (Codex). What changed is in the [changelog](./CHANGELOG.md).
+When a new version is out, your assistant tells you in the next conversation and how to get it:
+
+- **Claude app:** download the new `busybar.mcpb` and double-click it
+- **Claude Code:** `/plugin update busybar`
+- **Codex:** `codex plugin marketplace upgrade busybar`, then `codex plugin add busybar@busybar`
+
+What changed is in the [changelog](./CHANGELOG.md).
 
 ---
 
