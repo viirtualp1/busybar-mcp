@@ -39,6 +39,8 @@ export type Scene = {
   urgent?: boolean;
   /** Skip the photo of the real screen after drawing; the notifier has no one to show it to. */
   photo?: boolean;
+  /** Seconds until the Bar removes everything in the scene by itself; 0 or unset keeps it. */
+  timeout?: number;
 };
 
 export type DrawResult = {
@@ -317,7 +319,13 @@ export async function draw(scene: Scene): Promise<DrawResult> {
       ...pictures,
       ...(scene.pixels ?? []).map((art, i) => xpmElement(`px${i}`, art)),
       ...scene.elements.filter((e) => e.type === 'text'),
-    ].map((element, i) => ({ ...element, id: `${display}-${element.id}`, display, z_index: i }));
+    ].map((element, i) => ({
+      ...element,
+      id: `${display}-${element.id}`,
+      display,
+      z_index: i,
+      ...(scene.timeout ? { timeout: scene.timeout } : {}),
+    }));
 
     await clearOwn(synced ? shown[display] : undefined);
     await client.displayDraw({

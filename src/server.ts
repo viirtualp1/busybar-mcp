@@ -21,6 +21,7 @@ import {
   type Scene,
   type StockKind,
 } from './bar.js';
+import { LOGOS } from './logos.js';
 import { prepareImage } from './media/image.js';
 import { audioToSnd, MAX_SECONDS, melodyToSnd } from './media/sound.js';
 import { readSettings, writeSettings } from './settings.js';
@@ -111,13 +112,16 @@ server.registerTool(
       line2_color: color.optional(),
       accent: color.optional().describe('Draws a 3px coloured band on the left'),
       led_color: color.optional().describe('Blink the status LED in this colour'),
+      logo: z.enum(['claude', 'codex']).optional().describe('Show the Claude or Codex logo at the left, e.g. for "Claude is working on…"'),
       display,
       urgent,
     },
   },
-  async ({ line1, line2, color: c, line2_color, accent, led_color, display: where, urgent: force }) => {
+  async ({ line1, line2, color: c, line2_color, accent, led_color, logo, display: where, urgent: force }) => {
     const layout = LAYOUT[where];
-    const x = accent ? layout.x + 5 : layout.x;
+    const logoX = where === 'front' ? 0 : 2;
+    const logoWidth = where === 'front' ? 18 : 48;
+    const x = logo ? logoWidth : accent ? layout.x + 5 : layout.x;
     const width = layout.width - (x - layout.x);
     const twoLines = line2 !== undefined;
 
@@ -125,8 +129,9 @@ server.registerTool(
       display: where,
       ledColor: led_color,
       urgent: force,
+      pixels: logo ? [{ ...LOGOS[logo][where], x: logoX, y: where === 'front' ? 0 : 4 }] : [],
       elements: [
-        ...(accent ? [rect('accent', 0, 0, 3, layout.accentHeight, accent)] : []),
+        ...(accent && !logo ? [rect('accent', 0, 0, 3, layout.accentHeight, accent)] : []),
         text('line1', line1, {
           x,
           y: twoLines ? layout.line1Y : layout.oneLineY,

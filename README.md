@@ -51,8 +51,8 @@ The Bar is found over USB. On Wi-Fi, tell Claude where it is: *"my Bar is at 192
 
 Works on both screens: the front colour strip and the back greyscale panel.
 
-**Answer-ready notifications.** When Claude Code or Codex finishes an answer, the Bar shows a short summary of it,
-blinks and chimes; Claude Code also shows when it is waiting for your permission. Turn it off in `/plugin` settings
+**Answer-ready notifications.** When Claude Code or Codex finishes an answer, the Bar shows its logo and a short
+summary of the answer, blinks and chimes; Claude Code also shows when it is waiting for your permission. Turn it off in `/plugin` settings
 (Claude Code) or with `npx busybar-mcp install --no-notify` (Codex).
 
 ## Settings

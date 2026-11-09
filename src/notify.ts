@@ -3,6 +3,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { LOGOS } from './logos.js';
 import { HOME_DIR } from './settings.js';
 import { summarize, wrap } from './text.js';
 
@@ -165,25 +166,26 @@ function forwardCodex(payloadArg: string | undefined) {
 }
 
 async function show(event: Event) {
-  const { draw, playSound, rect, text } = await import('./bar.js');
+  const { draw, playSound, text } = await import('./bar.js');
   const { melodyToSnd } = await import('./media/sound.js');
   const seconds = Number(process.env.BUSYBAR_NOTIFY_SECONDS) || 300;
   const color = COLORS[event.kind];
-  const title = event.kind === 'ready' ? `${event.agent} - ready` : `${event.agent} - needs you`;
+  const logo = LOGOS[event.agent === 'Claude' ? 'claude' : 'codex'];
+  const title = event.kind === 'ready' ? 'ready' : 'needs you';
   const summary = summarize(event.text, 170) || (event.kind === 'ready' ? 'Done.' : 'Waiting for you.');
-  const header = event.project ? `${event.agent} - ${event.project}` : event.agent;
-  const lines = wrap(summary, 34, 5);
-  const expire = <T extends object>(element: T) => ({ ...element, timeout: seconds });
+  const header = event.project ?? event.agent;
+  const lines = wrap(summary, 23, 6);
 
   const front = await draw({
     display: 'front',
     photo: false,
+    timeout: seconds,
     ledColor: color,
+    pixels: [{ ...logo.front, x: 0, y: 0 }],
     elements: [
-      rect('band', 0, 0, 3, 16, color),
-      text('title', title, { x: 6, y: 0, width: 66, color }),
-      text('summary', summary, { x: 6, y: 8, width: 66, color: '#DDDDDD', scroll_rate: summary.length > 16 ? 900 : undefined }),
-    ].map(expire),
+      text('title', title, { x: 18, y: 0, width: 54, color }),
+      text('summary', summary, { x: 18, y: 8, width: 54, color: '#DDDDDD', scroll_rate: summary.length > 13 ? 900 : undefined }),
+    ],
   });
 
   if (!front.sent) {
@@ -194,10 +196,12 @@ async function show(event: Event) {
   await draw({
     display: 'back',
     photo: false,
+    timeout: seconds,
+    pixels: [{ ...logo.back, x: 2, y: 4 }],
     elements: [
-      text('header', header, { x: 6, y: 4, width: 138, color: '#888888' }),
-      ...lines.map((line, i) => text(`line${i}`, line, { x: 6, y: 18 + i * 11, width: 138 })),
-    ].map(expire),
+      text('header', header, { x: 48, y: 4, width: 96, color: '#888888' }),
+      ...lines.map((line, i) => text(`line${i}`, line, { x: 48, y: 16 + i * 10, width: 96 })),
+    ],
   });
 
   if (process.env.BUSYBAR_NOTIFY_SOUND !== '0') {
