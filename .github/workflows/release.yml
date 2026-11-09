@@ -54,7 +54,14 @@ jobs:
       - name: GitHub release with the Desktop extension
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" build/busybar.mcpb --title "$GITHUB_REF_NAME" --generate-notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '/^## /{p = ($2 == v); next} p' CHANGELOG.md > notes.md
+          if [ -s notes.md ]; then
+            gh release create "$GITHUB_REF_NAME" build/busybar.mcpb --title "$GITHUB_REF_NAME" --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" build/busybar.mcpb --title "$GITHUB_REF_NAME" --generate-notes
+          fi
 
       # No NODE_AUTH_TOKEN: auth comes from the OIDC trusted publisher
       # configured at npmjs.com -> package -> Settings -> Access.

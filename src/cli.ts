@@ -5,6 +5,7 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import {
   CLIENTS,
+  hasDesktopExtension,
   hasDesktopJsonEntry,
   openExtension,
   uninstallDesktopJson,
@@ -22,6 +23,7 @@ import {
 } from './install/hooks.js';
 import { hasSkill, installSkills, uninstallSkills, SKILL } from './install/skill.js';
 import { notify } from './notify.js';
+import { checkForUpdate } from './update.js';
 import { applySettings, HOME_DIR, readSettings, SERVER_FILE, SETTINGS_FILE, writeSettings, type Settings } from './settings.js';
 import { VERSION } from './version.js';
 
@@ -38,6 +40,7 @@ const HELP = `busybar-mcp ${VERSION} — MCP server for the BUSY Bar
 
 Usage:
   npx busybar-mcp install     set up Claude Code, Codex and Claude Desktop
+  npx busybar-mcp@latest update   update every install on this machine
   npx busybar-mcp uninstall   remove it from all of them
   npx busybar-mcp doctor      show where it is installed and whether the Bar answers
   npx busybar-mcp             run the MCP server on stdio (what the clients call)
@@ -220,6 +223,51 @@ async function install(flags: Flags) {
   console.log('\nStart a new Claude Code / Codex session to see the busybar tools.');
 }
 
+/** Brings every install this machine already has up to this version, keeping the choices made at install. */
+async function update() {
+  mkdirSync(HOME_DIR, { recursive: true });
+  copyFileSync(bundleFile, SERVER_FILE);
+
+  const launch: Launch = { command: process.execPath, args: [SERVER_FILE] };
+  const outcomes: Outcome[] = [];
+
+  for (const client of CLIENTS) {
+    if (client.id === 'claude-desktop' || !client.detect() || !client.status().startsWith('installed')) {
+      continue;
+    }
+
+    const id = client.id === 'codex' ? 'codex' : 'claude';
+    outcomes.push(await client.install(launch));
+
+    if (hasSkill(id)) {
+      outcomes.push(...installSkills(id));
+    }
+
+    if (id === 'claude' && hasClaudeHooks()) {
+      outcomes.push(installClaudeHooks(launch));
+    }
+
+    if (id === 'codex' && hasCodexNotify()) {
+      outcomes.push(installCodexNotify(launch));
+    }
+  }
+
+  if (hasDesktopJsonEntry()) {
+    outcomes.push(await CLIENTS.find((client) => client.id === 'claude-desktop')!.install(launch));
+  } else if (hasDesktopExtension() && existsSync(extensionFile)) {
+    outcomes.push(await openExtension(extensionFile));
+  }
+
+  if (outcomes.length === 0) {
+    console.log('Nothing installed to update. Run `npx busybar-mcp install` first.');
+    return;
+  }
+
+  console.log(`Updated to ${VERSION}:`);
+  print(outcomes);
+  console.log('\nStart a new Claude Code / Codex session to use it.');
+}
+
 async function uninstall(flags: Flags) {
   const outcomes: Outcome[] = [];
 
@@ -262,6 +310,9 @@ async function doctor() {
   console.log(`  skill: Claude Code ${hasSkill('claude') ? 'on' : 'off'}, Codex ${hasSkill('codex') ? 'on' : 'off'}`);
 
   console.log(`  Bar at ${settings.BUSY_ADDR || '10.0.4.20'} ${await reachBar(settings)}`);
+
+  const newer = await checkForUpdate({ force: true });
+  console.log(newer ? `  update: ${newer.latest} is out (${newer.url}); run npx busybar-mcp@latest update` : '  update: up to date');
 }
 
 async function main() {
@@ -278,6 +329,9 @@ async function main() {
       }
       case 'install':
         await install(parseFlags(rest));
+        break;
+      case 'update':
+        await update();
         break;
       case 'uninstall':
         await uninstall(parseFlags(rest));

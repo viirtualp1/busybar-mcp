@@ -27,9 +27,14 @@ import { audioToSnd, MAX_SECONDS, melodyToSnd } from './media/sound.js';
 import { readSettings, writeSettings } from './settings.js';
 import { ciScene, inbox, inboxScene, latestCi } from './services/github.js';
 import { weather, weatherScene } from './services/weather.js';
+import { checkForUpdate, type UpdateInfo } from './update.js';
 import { VERSION } from './version.js';
 
 const server = new McpServer({ name: 'busybar', version: VERSION });
+
+let update: UpdateInfo | undefined;
+
+let updateNoticeShown = false;
 
 const color = z.string().describe('Hex colour, #RRGGBB');
 
@@ -66,14 +71,25 @@ function result(summary: unknown, drawn?: DrawResult): CallToolResult {
 
   return {
     content: [
-      { type: 'text', text: [delivery, body].filter(Boolean).join('\n') },
+      { type: 'text', text: [delivery, body, takeUpdateNotice()].filter(Boolean).join('\n') },
       ...(drawn ? [image(drawn.actual ?? drawn.preview)] : []),
     ],
   };
 }
 
 function failure(err: unknown): CallToolResult {
-  return { isError: true, content: [{ type: 'text', text: describe(err) }] };
+  return { isError: true, content: [{ type: 'text', text: [describe(err), takeUpdateNotice()].filter(Boolean).join('\n') }] };
+}
+
+/** Once per session: the first tool result after the check found a newer release carries the note. */
+function takeUpdateNotice() {
+  if (!update || updateNoticeShown) {
+    return undefined;
+  }
+
+  updateNoticeShown = true;
+
+  return `Note for the user: busybar ${update.latest} is out (this is ${update.current}). To update, ${update.how}. Release notes: ${update.url}`;
 }
 
 async function show(scene: Scene, summary: unknown = '') {
@@ -462,9 +478,9 @@ server.registerTool(
     const info = connectionInfo();
 
     try {
-      return result({ ...info, system: info.dryRun ? null : await status() });
+      return result({ ...info, version: VERSION, update: update ?? null, system: info.dryRun ? null : await status() });
     } catch (err) {
-      return result({ ...info, reachable: false, error: describe(err) });
+      return result({ ...info, version: VERSION, update: update ?? null, reachable: false, error: describe(err) });
     }
   },
 );
@@ -524,8 +540,13 @@ server.registerTool(
   },
 );
 
+async function lookForUpdate() {
+  update = await checkForUpdate();
+}
+
 export async function startServer() {
   await server.connect(new StdioServerTransport());
+  lookForUpdate();
 
   for (const warning of connectionInfo().warnings) {
     console.error(`busybar-mcp: ${warning}`);

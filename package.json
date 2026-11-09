@@ -1,6 +1,6 @@
 {
   "name": "busybar-mcp",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "MCP server that lets Claude and Codex draw and play sounds on a BUSY Bar, with a one-command installer and a Claude Desktop extension",
   "author": "viirtualp1",
   "license": "MIT",

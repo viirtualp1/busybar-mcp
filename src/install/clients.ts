@@ -253,6 +253,11 @@ export async function openExtension(file: string): Promise<Outcome> {
   }
 }
 
+/** An extension installed from busybar.mcpb, which Claude Desktop keeps in its own folder. */
+export function hasDesktopExtension() {
+  return Boolean(desktopDir) && existsSync(join(desktopDir, 'Claude Extensions', 'local.mcpb.viirtualp1.busybar'));
+}
+
 export function hasDesktopJsonEntry() {
   return Boolean(readJson(desktopConfig)?.mcpServers?.[SERVER_NAME]);
 }

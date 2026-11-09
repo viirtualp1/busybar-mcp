@@ -10,7 +10,7 @@
       "name": "busybar",
       "source": "./plugin",
       "description": "Draw, show pictures and play sounds on your BUSY Bar, and see a summary of every answer on it when Claude finishes.",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "category": "productivity"
     }
   ]

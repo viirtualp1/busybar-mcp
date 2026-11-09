@@ -30,6 +30,16 @@ The Bar is found over USB. On Wi-Fi, tell Claude where it is: *"my Bar is at 192
 > On macOS, allow the app under **System Settings → Privacy & Security → Local Network**,
 > or it won't reach the Bar.
 
+## Updating
+
+When a new version is out, Claude or Codex tells you in the next conversation, with what to run:
+
+- **Claude Code:** `/plugin update busybar`
+- **Claude Desktop:** download the new `busybar.mcpb` and double-click it
+- **Codex:** `npx busybar-mcp@latest update`
+
+What changed is in the [changelog](./CHANGELOG.md). To hear about releases on GitHub: **Watch → Custom → Releases**.
+
 ## What it can do
 
 | Tool | |
@@ -76,7 +86,8 @@ BUSYBAR_DRY_RUN=1 npm run smoke   # every tool, no Bar needed
 npm run live                      # media tools on a real Bar
 ```
 
-To release, bump `version`, tag `vX.Y.Z` and push: CI publishes to npm and attaches `busybar.mcpb` to the release.
+To release: bump `version`, add a `## X.Y.Z` section to `CHANGELOG.md`, `npm run build`, commit, tag `vX.Y.Z` and push.
+CI publishes to npm and makes a GitHub release with `busybar.mcpb` and that changelog section.
 
 ## License
 
