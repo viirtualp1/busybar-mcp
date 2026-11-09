@@ -65,4 +65,14 @@ jobs:
 
       # No NODE_AUTH_TOKEN: auth comes from the OIDC trusted publisher
       # configured at npmjs.com -> package -> Settings -> Access.
-      - run: npm publish --access public
+      # Trusted publishing can't create a package, so the very first version is published by hand.
+      - name: Publish to npm
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if ! npm view busybar-mcp version >/dev/null 2>&1; then
+            echo "::warning::busybar-mcp is not on npm yet. Publish it once by hand, then set up trusted publishing."
+          elif npm view "busybar-mcp@$version" version >/dev/null 2>&1; then
+            echo "busybar-mcp@$version is already on npm"
+          else
+            npm publish --access public
+          fi
