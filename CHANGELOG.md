@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.0
+
+- Made for everyone, not just developers: plug the Bar in or keep it on the same Wi-Fi, and Claude finds it by itself.
+  `bar_connect` without an address looks for it too, and asks which one when there are several Bars.
+- Ready-made actions in the Claude app's + menu: set up the Bar, set a status, focus timer, weather, and
+  "tell me on the Bar when you finish".
+- `bar_set_status`: meeting, call, focus, lunch, back soon and more, with the Bar's own animations, optionally for
+  a number of minutes.
+- `bar_timer`: a countdown the Bar runs by itself, with a chime at the end. No busybar-wm needed.
+- Only the tools that can work are offered: the busybar-wm tools appear once a WM is found, the GitHub tools when
+  there is a token or the `gh` CLI.
+- Errors say what to do in plain words, and an unreachable Bar is reported after 4 seconds instead of 10.
+- The README starts with what to install and what to say.
+
 ## 0.10.0
 
 - Set an optional LAN fallback address for the same Bar. The MCP prefers USB and uses LAN when USB is unreachable.

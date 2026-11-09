@@ -2,6 +2,7 @@ import {
   type BusyBar,
   generateXpm2,
   type AnimationElement,
+  type CountdownElement,
   type ImageElement,
   type RectangleElement,
   type TextElement,
@@ -12,7 +13,9 @@ import { BACK, FRONT } from 'busybar-kit/device';
 import { isLowPriority } from 'busybar-kit/errors';
 import { Bitmap, parseColor, renderOnto, type Rgba } from 'busybar-kit/preview';
 import { createConnections, selectConnection } from './connection.js';
+import { findBars } from './discover.js';
 import type { Display } from './media/image.js';
+import { readSettings, writeSettings } from './settings.js';
 import { toAscii } from './text.js';
 import { wmCommand } from './wm.js';
 
@@ -30,6 +33,15 @@ export type SceneImage =
   | { kind: 'stock'; name: string; animated: boolean; loop?: boolean; x: number; y: number };
 
 /** What the server draws on one display: the device's own elements, plus what the preview has to paint itself. */
+export type Countdown = {
+  id: string;
+  endsAt: Date;
+  x: number;
+  y: number;
+  align?: TextElement['align'];
+  color?: string;
+};
+
 export type Scene = {
   display?: Display;
   elements: Array<TextElement | RectangleElement>;
@@ -42,6 +54,8 @@ export type Scene = {
   photo?: boolean;
   /** Seconds until the Bar removes everything in the scene by itself; 0 or unset keeps it. */
   timeout?: number;
+  /** Countdowns the Bar runs by itself, so nothing has to redraw every second. */
+  countdowns?: Countdown[];
 };
 
 export type DrawResult = {
@@ -80,8 +94,9 @@ const CAP_TOP: Partial<Record<string, number>> = { tiny: 1 };
 const PREVIEW_SCALE: Record<Display, number> = { front: 10, back: 4 };
 
 const REACH_HINT =
-  'Check the Bar is on and plugged in over USB (or on the same Wi-Fi). On macOS 15+, the app running this ' +
-  '(Claude, ChatGPT/Codex) also needs System Settings → Privacy & Security → Local Network turned on.';
+  'Make sure it is switched on and connected with the USB cable, or to the same Wi-Fi as this computer. ' +
+  'On a Mac, the app you are chatting in (Claude, ChatGPT) also needs permission: System Settings → ' +
+  'Privacy & Security → Local Network.';
 
 let connections = createConnections();
 
@@ -99,7 +114,12 @@ const uploaded = new Set<string>();
 
 const stockCache = new Map<StockKind, string[]>();
 
+/** The Wi-Fi search runs at most once per process: it takes a few seconds, and the answer rarely changes. */
+let lookedOnWifi = false;
+
 async function currentConnection() {
+  await findOnWifiIfNeeded();
+
   const configured = connections;
   const selected = await selectConnection(configured);
 
@@ -110,6 +130,54 @@ async function currentConnection() {
   active = selected;
 
   return selected;
+}
+
+async function answers(client: BusyBar) {
+  try {
+    await client.systemVersionGet({ timeout: 1000 });
+    return true;
+  } catch (error) {
+    // Any HTTP answer, even an error, means something is there.
+    return error instanceof Error && 'status' in error;
+  }
+}
+
+/**
+ * A Bar set up over USB but now only on Wi-Fi (cable out, or it never had one): look for it on the network once,
+ * and if exactly one Bar answers, remember it as the Wi-Fi fallback. Several Bars are left for bar_connect to ask.
+ */
+async function findOnWifiIfNeeded() {
+  if (lookedOnWifi || dryRun || connections.lan || !connections.primary.config.isUsb) {
+    return;
+  }
+
+  lookedOnWifi = true;
+
+  if (await answers(connections.primary.client)) {
+    return;
+  }
+
+  const found = await findBars();
+
+  if (found.length === 1) {
+    useWifiAddress(found[0].addr);
+  }
+}
+
+/**
+ * Saves a Bar found on Wi-Fi: as the fallback when the main connection is USB (the cable still wins when it is in),
+ * otherwise as the address itself, replacing one that no longer answers.
+ */
+export function useWifiAddress(addr: string) {
+  const key = connections.primary.config.isUsb ? 'BUSY_LAN_ADDR' : 'BUSY_ADDR';
+
+  writeSettings({ ...readSettings(), [key]: addr });
+  process.env[key] = addr;
+  reconnect();
+}
+
+export async function discoverBars() {
+  return findBars();
 }
 
 function isCurrent(client: BusyBar) {
@@ -295,7 +363,17 @@ export function preview(scene: Scene) {
     .filter((e) => e.type === 'text')
     .map((e) => ({ ...e, y: (e.y ?? 0) + (CAP_TOP[e.font] ?? 2) }));
 
-  renderOnto(bitmap, texts, display);
+  const countdowns = (scene.countdowns ?? []).map((countdown) =>
+    text(countdown.id, remaining(countdown.endsAt), {
+      x: countdown.x,
+      y: countdown.y + 2,
+      align: countdown.align ?? 'top_left',
+      color: countdown.color,
+      display,
+    }),
+  );
+
+  renderOnto(bitmap, [...texts, ...countdowns], display);
 
   return bitmap.scale(PREVIEW_SCALE[display]).toPng();
 }
@@ -305,7 +383,8 @@ async function upload(connected: BusyBar, file: string, data: Buffer) {
     return;
   }
 
-  await connected.assetsUpload({ application_name: APP_NAME, file, data });
+  // A picture or a sound over Wi-Fi takes longer than an ordinary request.
+  await connected.assetsUpload({ application_name: APP_NAME, file, data }, { timeout: 30_000 });
 
   if (isCurrent(connected)) {
     uploaded.add(file);
@@ -355,6 +434,7 @@ export async function draw(scene: Scene): Promise<DrawResult> {
       ...pictures,
       ...(scene.pixels ?? []).map((art, i) => xpmElement(`px${i}`, art)),
       ...scene.elements.filter((e) => e.type === 'text'),
+      ...(scene.countdowns ?? []).map(countdownElement),
     ].map((element, i) => ({
       ...element,
       id: `${display}-${element.id}`,
@@ -386,7 +466,7 @@ export async function draw(scene: Scene): Promise<DrawResult> {
     return { sent: true, preview: png, actual: scene.photo === false ? undefined : await settledScreenshot(connected, display) };
   } catch (err) {
     const error = isLowPriority(err)
-      ? 'the Bar is showing something more important (an active BUSY work session or another app), so nothing was drawn. Retry with urgent: true only if the user asked to interrupt it'
+      ? 'the Bar is busy with something more important (a focus session or another app), so nothing was shown. Try again with urgent: true only if the user asked to interrupt it.'
       : describe(err);
 
     return { sent: false, error, preview: png };
@@ -457,6 +537,31 @@ async function clearOwn(connected: BusyBar, ids?: string[]) {
       throw err;
     }
   }
+}
+
+function countdownElement({ id, endsAt, x, y, align, color }: Countdown): CountdownElement {
+  return {
+    id,
+    type: 'countdown',
+    timestamp: String(Math.round(endsAt.getTime() / 1000)),
+    direction: 'time_left',
+    show_hours: 'when_non_zero',
+    align: align ?? 'top_left',
+    x,
+    y,
+    color: rgba(color ?? '#FFFFFF'),
+    timeout: 0,
+  };
+}
+
+/** What a countdown shows right now, the way the Bar writes it: 4:05, or 1:02:03 once there are hours. */
+export function remaining(endsAt: Date, now = new Date()) {
+  const total = Math.max(0, Math.round((endsAt.getTime() - now.getTime()) / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = String(total % 60).padStart(2, '0');
+
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`;
 }
 
 /** The real screen, as a PNG. */
@@ -563,14 +668,26 @@ async function readDiagnostic<T>(read: () => Promise<T>) {
   }
 }
 
+/**
+ * Errors in words a user can act on; whatever the model passes on should make sense to someone who never saw an
+ * HTTP status. The technical reason stays at the end in brackets for whoever has to debug it.
+ */
 export function describe(err: unknown) {
+  const where = active.config.busyAddr;
+
   if (err && typeof err === 'object' && 'status' in err) {
-    const e = err as { status: number; message: string; body?: unknown };
-    return `HTTP ${e.status}: ${e.message}${e.body ? ` ${JSON.stringify(e.body)}` : ''}`;
+    const { status, message, body } = err as { status: number; message: string; body?: unknown };
+    const said = body && typeof body === 'object' && 'error' in body ? String(body.error) : message;
+
+    if (status === 401 || status === 403) {
+      return `The Bar at ${where} asked for its password. It is under Settings → HTTP Access on the Bar; tell me it and I will connect again. (HTTP ${status})`;
+    }
+
+    return `The Bar said no: ${said}. (HTTP ${status})`;
   }
 
   if (err instanceof Error && err.name === 'TimeoutError') {
-    return `the Bar at ${active.config.busyAddr} did not answer in time. ${REACH_HINT}`;
+    return `Your BUSY Bar (at ${where}) did not answer. ${REACH_HINT} (timeout)`;
   }
 
   // Node's fetch says only "fetch failed"; the reason is in `cause`.
@@ -578,7 +695,7 @@ export function describe(err: unknown) {
 
   if (cause) {
     const code = 'code' in cause && typeof cause.code === 'string' ? cause.code : cause.message;
-    return `cannot reach the Bar at ${active.config.busyAddr} (${code}). ${REACH_HINT}`;
+    return `Cannot reach your BUSY Bar (at ${where}). ${REACH_HINT} (${code})`;
   }
 
   return err instanceof Error ? err.message : String(err);

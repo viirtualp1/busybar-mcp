@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
 import { FRONT_ROW, rect, text, type Scene } from '../bar.js';
 
@@ -12,6 +13,15 @@ function ghBinary() {
   const known = ['/opt/homebrew/bin/gh', '/usr/local/bin/gh', '/usr/bin/gh'];
 
   return known.find((path) => existsSync(path)) ?? 'gh';
+}
+
+/** A token or the GitHub CLI: without either the GitHub tools have nothing to sign in with. */
+export function hasGitHubLogin() {
+  return Boolean(process.env.GITHUB_TOKEN) || ghBinary() !== 'gh' || existsOnPath('gh');
+}
+
+function existsOnPath(name: string) {
+  return (process.env.PATH ?? '').split(delimiter).some((dir) => dir && existsSync(join(dir, name)));
 }
 
 /** GITHUB_TOKEN, or whatever `gh` is logged in with. */

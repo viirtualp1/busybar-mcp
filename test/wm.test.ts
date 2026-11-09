@@ -112,6 +112,21 @@ async function connectClient(env: Record<string, string>) {
   return client;
 }
 
+/** WM tools appear once the server has found the WM, which it does in the background after starting. */
+async function toolsWhenReady(client: Client, wanted: string[]) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const { tools } = await client.listTools();
+
+    if (wanted.every((name) => tools.some((tool) => tool.name === name))) {
+      return tools;
+    }
+
+    await new Promise((done) => setTimeout(done, 100));
+  }
+
+  return (await client.listTools()).tools;
+}
+
 function firstText(result: Awaited<ReturnType<Client['callTool']>>) {
   const content = result.content;
   assert.ok(Array.isArray(content));
@@ -125,16 +140,17 @@ test('stdio discovers the eight tools and validates messages before contacting t
   const wm = await fixture();
   t.after(wm.close);
 
-  const tools = (await wm.client.listTools()).tools;
+  const tools = await toolsWhenReady(wm.client, names);
   assert.deepEqual(tools.filter((tool) => names.includes(tool.name)).map((tool) => tool.name), names);
   const message = tools.find((tool) => tool.name === 'busybar_show_message');
   assert.deepEqual(message?.inputSchema.required, ['message']);
 
+  const before = wm.requests.length;
   const invalid = await wm.client.callTool({
     name: 'busybar_show_message', arguments: { message: 'test', durationSeconds: -1 },
   });
   assert.equal(invalid.isError, true);
-  assert.equal(wm.requests.length, 0);
+  assert.equal(wm.requests.length, before);
 });
 
 test('stdio separates read-only diagnostics and WM commands', async (t) => {
@@ -185,6 +201,7 @@ test('reports unavailable apps, device disconnection, and WM timeouts', async (t
   const wm = await fixture();
   t.after(wm.close);
 
+  await toolsWhenReady(wm.client, names);
   const missing = await wm.client.callTool({ name: 'busybar_switch_app', arguments: { app: 'missing' } });
   assert.equal(missing.isError, true);
   assert.match(firstText(missing), /absent/);
@@ -217,7 +234,8 @@ test('draws, plays sound, and clears directly without a WM', async (t) => {
 
   const sound = await bar.client.callTool({ name: 'bar_sound', arguments: { melody: 'C5:120' } });
   assert.match(firstText(sound), /Playing/);
-  assert.equal(bar.requests.some(({ url }) => url === path), false);
+  // The server looks for a WM once at start (a GET); drawing itself must not go through it.
+  assert.equal(bar.requests.some(({ method, url }) => url === path && method !== 'GET'), false);
 
   const clear = await bar.client.callTool({ name: 'bar_clear', arguments: { display: 'front' } });
   assert.equal(firstText(clear), 'Cleared.');
@@ -233,7 +251,10 @@ test('draws, plays sound, and clears directly without a WM', async (t) => {
   );
   assert.equal(bar.commands.length, 0);
 
+  // Without a WM its tools stay out of the list, and calling one anyway is refused.
+  const { tools } = await bar.client.listTools();
+  assert.equal(tools.some((tool) => names.includes(tool.name) && !tool.name.startsWith('busybar_get_')), false);
   const overlay = await bar.client.callTool({ name: 'busybar_show_message', arguments: { message: 'WM overlay' } });
   assert.equal(overlay.isError, true);
-  assert.match(firstText(overlay), /needs busybar-wm/);
+  assert.match(firstText(overlay), /disabled/);
 });

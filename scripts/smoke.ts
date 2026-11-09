@@ -10,7 +10,7 @@ await client.connect(
   new StdioClientTransport({
     command: 'npx',
     args: ['tsx', 'src/cli.ts'],
-    env: { ...process.env } as Record<string, string>,
+    env: { ...process.env, BUSYBAR_ALL_TOOLS: '1' } as Record<string, string>,
     stderr: 'inherit',
   }),
 );
@@ -38,6 +38,9 @@ const calls: Array<[string, Record<string, unknown>]> = [
   ['bar_animation', { name: 'coding_72x16.anim' }],
   ['bar_sound', { melody: 'C5:120 E5:120 G5:300', wave: 'sine' }],
   ['bar_stock', {}],
+  ['bar_set_status', { status: 'meeting', minutes: 30 }],
+  ['bar_timer', { minutes: 25, label: 'Focus' }],
+  ['bar_timer', { minutes: 4, display: 'back' }],
   ['weather', { city: 'Moscow' }],
   ['github_ci', { repo: 'busy-app/busylib-ts' }],
   ['github_inbox', {}],

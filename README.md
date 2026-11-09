@@ -1,103 +1,73 @@
-# busybar-mcp
+# BUSY Bar for Claude
 
 > [!IMPORTANT]
 > Unofficial community project, not affiliated with Flipper Devices / BUSY.
 
-Let Claude and Codex draw and play sounds on your [BUSY Bar](https://busy.app/): text, pixel art, pictures,
-animations, melodies, GitHub status and the weather.
-
-Just ask: *"put 'In a meeting' on the Bar"*, *"draw a cat on the back screen"*, *"play a fanfare"*.
-
-## Display orchestration
-
-BusyBar MCP connects directly to the Bar over USB by default. Drawing, sound,
-and device diagnostics work with the direct connection.
-
-For shared display orchestration, point BusyBar MCP at
-[busybar-wm](https://github.com/viirtualp1/busybar-wm).
-
-```text
-AI client → BusyBar MCP → busybar-wm → BUSY Bar
-```
-
-When connected through the WM, display commands use its proxy. The WM
-arbitrates display ownership and keeps each app's latest frame. Temporary messages and countdowns are drawn as a layer
-over the app selected by the WM, so app ownership and input routing continue
-underneath. When the overlay expires, the WM removes it and reveals the current
-app's frame. Use `bar_clear` to dismiss it sooner. Each display can hold one
-overlay at a time, and a new overlay on that display replaces the previous one.
-
-Read-only diagnostics report hardware, battery, firmware, available updates,
-Wi-Fi, Bluetooth Low Energy, and the Bar's USB or Wi-Fi transport. Through the
-WM, these requests are forwarded to the device without claiming the display.
-The diagnostic tools report which readings the device could provide.
+Talk to Claude, and your [BUSY Bar](https://busy.app/) does it: shows that you are in a meeting, counts down a focus
+session, puts up a note, a picture or the weather, plays a little melody.
 
 ## Install
 
-**Claude Code:** type this in Claude Code.
+**Claude app (Mac or Windows)**
 
-```
-/plugin install busybar --marketplace viirtualp1/busybar-mcp
-```
+1. Download [**busybar.mcpb**](https://github.com/viirtualp1/busybar-mcp/releases/latest/download/busybar.mcpb).
+2. Double-click it and press **Install**.
+3. Plug your Bar in with its USB cable, or keep it on the same Wi-Fi as your computer. That's it: Claude finds it.
 
-**Claude Desktop:** download [`busybar.mcpb`](https://github.com/viirtualp1/busybar-mcp/releases/latest),
-double-click it, press **Install**.
+On a Mac, the first time, allow Claude to see devices on your network:
+**System Settings → Privacy & Security → Local Network → Claude** (switch it on).
 
-**Codex:**
+<details>
+<summary>Claude Code or Codex</summary>
 
-```bash
-npx busybar-mcp install --yes
-```
+**Claude Code:** type `/plugin install busybar --marketplace viirtualp1/busybar-mcp`
 
-### Connect directly
+**Codex:** run `npx busybar-mcp install --yes` in a terminal.
+</details>
 
-Plug the Bar in over USB and leave the address blank to use `10.0.4.20`.
-On Wi-Fi, tell your assistant the Bar's address, for example *"my Bar is at
-192.168.1.50"*. You can also use the BUSY cloud endpoint with a token.
+## Try saying
 
-To use both USB and LAN, leave the main address at the USB default and enter
-the **LAN fallback address** for the same Bar. The MCP checks USB before each
-operation and uses LAN when it can't reach USB. It checks USB again on the
-next operation, so reconnecting the cable restores USB preference. In Codex,
-run `npx busybar-mcp install --yes --addr 10.0.4.20 --lan-addr 192.168.1.50`.
+- *"Set my status to In a meeting for 30 minutes"*
+- *"Start a 25-minute focus timer"*
+- *"Put 'Back at 3' on the Bar"*
+- *"Show the weather in Berlin on the Bar"*
+- *"Draw a cat on the back screen"*
+- *"Play a happy little tune"*
+- *"Clean up the report, and tell me on the Bar when you're done"*
 
-### Optional busybar-wm setup
+In the Claude app, ready-made actions are also in the **+** menu: *Set up my BUSY Bar*, *Set my status*,
+*Focus timer*, *Weather on the Bar*, *Tell me on the Bar when you finish*.
 
-Start [busybar-wm 2.1.0 or later](https://github.com/viirtualp1/busybar-wm#quick-start).
-Configure the device address and credentials in
-the WM, then set the MCP's `BUSY_ADDR` to the WM's HTTP address, normally
-`http://127.0.0.1:4111`. With the Codex installer, pass `--addr <WM URL>`.
+The front of the Bar is the colour strip other people see; the back is the screen facing you.
 
-If the WM has a `WM_API_TOKEN`, enter the same token in the MCP client settings
-or pass `--wm-token <token>` to the installer. The WM requires a token for
-control requests from another machine.
+## If it doesn't work
 
-> On macOS, allow the app under **System Settings → Privacy & Security → Local Network**,
-> or it won't reach the Bar.
+Ask Claude *"set up my BUSY Bar"*: it checks the connection and walks you through it. The usual fixes:
+
+- **Not found:** plug the Bar in with the USB cable, or make sure it is on and on the same Wi-Fi as your computer.
+- **On a Mac:** System Settings → Privacy & Security → **Local Network** → switch on Claude (or ChatGPT for Codex),
+  then restart the app.
+- **Still nothing:** the Bar shows its address under **Settings → Wi-Fi**. Tell Claude *"my Bar is at …"*.
+- **Nothing shows up during a focus session:** the Bar keeps its own session on screen. Say *"show it anyway"*.
 
 ## Updating
 
-When a new version is out, Claude or Codex tells you in the next conversation, with what to run:
+When a new version is out, Claude tells you in your next conversation and how to get it: download the new
+`busybar.mcpb` and double-click it (Claude app), `/plugin update busybar` (Claude Code), or
+`npx busybar-mcp@latest update` (Codex). What changed is in the [changelog](./CHANGELOG.md).
 
-- **Claude Code:** `/plugin update busybar`
-- **Claude Desktop:** download the new `busybar.mcpb` and double-click it
-- **Codex:** `npx busybar-mcp@latest update`
+---
 
-What changed is in the [changelog](./CHANGELOG.md). To hear about releases on GitHub: **Watch → Custom → Releases**.
+## For developers
 
-## What it can do
+<details>
+<summary>All tools</summary>
 
 | Tool | |
 | --- | --- |
-| `busybar_get_status` | WM connection and active app, plus hardware, power, uptime, and firmware update status |
-| `busybar_get_connectivity` | Wi-Fi details, BLE status and address, and USB or Wi-Fi transport |
-| `busybar_list_apps` | **WM** · list manifest apps and see which have a frame ready |
-| `busybar_switch_app` | **WM** · pin a ready app by name |
-| `busybar_show_message` | **WM** · show a temporary message for 1–300 seconds |
-| `busybar_start_timer` | **WM** · show a countdown for 1–86,400 seconds |
-| `busybar_return_to_auto` | **WM** · release the app pin and resume automatic scheduling |
-| `busybar_send_input` | **WM** · route an OK or START tap, or an encoder step, to a subscribed WM app |
-| `bar_text` | one or two lines of text |
+| `bar_set_status` | a ready-made status from the Bar's own animations: meeting, call, focus, lunch, back soon… |
+| `bar_timer` | a countdown the Bar runs by itself, with a chime at the end |
+| `bar_text` | one or two lines of text, optionally with the Claude or Codex logo |
 | `bar_pixels` | pixel art |
 | `bar_progress` | a progress bar |
 | `bar_image` | a picture from a file, a URL or the Bar's stock |
@@ -105,45 +75,73 @@ What changed is in the [changelog](./CHANGELOG.md). To hear about releases on Gi
 | `bar_sound` | a built-in sound, an audio file, or a melody |
 | `bar_stock` | list built-in images, animations and sounds |
 | `bar_screenshot` | see what the screen shows |
-| `bar_clear` | dismiss what the MCP drew and release its claim on the display |
-| `bar_connect` | save the WM or Bar address and check reachability |
-| `bar_status` | read device status and check reachability |
-| `github_ci` | latest CI run of a repo |
-| `github_inbox` | PRs to review, your PRs, your issues |
+| `bar_clear` | dismiss what the MCP drew |
+| `bar_connect` | find the Bar on the Wi-Fi, or save an address |
+| `bar_status` | device status and reachability |
+| `busybar_get_status` | hardware, power, uptime, firmware and updates (and the WM, when there is one) |
+| `busybar_get_connectivity` | Wi-Fi, BLE and USB or Wi-Fi transport |
 | `weather` | weather for a city |
+| `github_ci`, `github_inbox` | CI status and GitHub inbox; shown when a GitHub token or the `gh` CLI is available |
+| `busybar_list_apps`, `busybar_switch_app`, `busybar_show_message`, `busybar_start_timer`, `busybar_return_to_auto`, `busybar_send_input` | **busybar-wm** only; shown once a WM is detected |
 
-Works on both screens: the front colour strip and the back greyscale panel.
+The server also offers the prompts above (`setup`, `status`, `focus`, `weather`, `tell_me_when_done`).
+Notifications are per request: nothing is shown or played unless you ask.
+</details>
 
-**Notifications are per request.** Ask your assistant to put a message on the Bar when a task finishes, or ask for a chime.
-Updating removes the previous BUSY Bar notification hooks and restores any earlier Codex notifier.
+<details>
+<summary>Connection</summary>
 
-## Settings
+The Bar is reached over USB (`10.0.4.20`) by default. When USB does not answer and no Wi-Fi address is saved, the
+server looks for the Bar on the network once (mDNS, `busybar-*._http._tcp`) and remembers it as the Wi-Fi fallback;
+with several Bars it asks which one. USB is preferred again as soon as it answers.
 
-Set in the plugin's settings (Claude Code), the extension's (Claude Desktop), or by `bar_connect` and
-`npx busybar-mcp install` in `~/.busybar-mcp/config.json`. Environment variables override them.
+You can also set addresses yourself: `bar_connect` with `addr` (and `lan_addr` for the USB-plus-Wi-Fi case), the
+extension or plugin settings, or `npx busybar-mcp install --addr 10.0.4.20 --lan-addr 192.168.1.50`. The BUSY cloud
+works too, with `https://api.busy.app` and a token.
 
 | Key | |
 | --- | --- |
 | `BUSY_ADDR` | Bar address (default `10.0.4.20` over USB), or the WM address |
-| `BUSY_LAN_ADDR` | optional Wi-Fi or LAN address of the same Bar, used only when the main address is USB |
-| `WM_API_TOKEN` | control token, if configured on the WM |
+| `BUSY_LAN_ADDR` | Wi-Fi address of the same Bar, used when USB does not answer |
 | `BUSY_HTTP_PASSWORD` | if the Bar's HTTP access is locked |
 | `BUSY_TOKEN` | cloud token, with `BUSY_ADDR=https://api.busy.app` |
+| `WM_API_TOKEN` | control token, if configured on the WM |
 | `GITHUB_TOKEN` | otherwise `gh auth token` is used |
 
-## Development
+Settings live in `~/.busybar-mcp/config.json`; environment variables override them.
+</details>
+
+<details>
+<summary>busybar-wm</summary>
+
+For shared display orchestration, point the server at
+[busybar-wm 2.1.0 or later](https://github.com/viirtualp1/busybar-wm#quick-start) (`BUSY_ADDR`, normally
+`http://127.0.0.1:4111`, plus `WM_API_TOKEN` if the WM has one):
+
+```text
+AI client → busybar-mcp → busybar-wm → BUSY Bar
+```
+
+The WM arbitrates display ownership and keeps each app's latest frame. Temporary messages and countdowns are drawn
+as an overlay over the selected app, and the WM reveals the app again when they expire. Each display holds one
+overlay at a time. Diagnostics are forwarded to the device without claiming the display.
+</details>
+
+<details>
+<summary>Building and releasing</summary>
 
 ```bash
 npm install
 npm run build                     # build/server.mjs, build/busybar.mcpb, plugin/
 npm test                          # stdio tool tests against mocked HTTP responses
-BUSYBAR_DRY_RUN=1 npm run smoke    # preview smoke checks
+BUSYBAR_DRY_RUN=1 npm run smoke   # preview smoke checks
 npm run live                      # media tools on a real Bar
-npm run live -- --wm              # diagnostics, temporary message and timer on a real Bar
+npm run live -- --wm              # diagnostics, temporary message and timer through a WM
 ```
 
-To release: bump `version`, add a `## X.Y.Z` section to `CHANGELOG.md`, `npm run build`, commit, tag `vX.Y.Z` and push.
-CI publishes to npm and makes a GitHub release with `busybar.mcpb` and that changelog section.
+To release: bump `version`, add a `## X.Y.Z` section to `CHANGELOG.md`, `npm run build`, commit, tag `vX.Y.Z` and
+push. CI publishes to npm and makes a GitHub release with `busybar.mcpb` and that changelog section.
+</details>
 
 ## License
 

@@ -7,7 +7,10 @@ type Connections = { primary: Connection; lan?: Connection; warnings: string[] }
 
 const USB_PROBE_MS = 1000;
 
-export function createConnections(env: NodeJS.ProcessEnv = process.env, timeout = 10_000): Connections {
+// Long enough for a Bar on slow Wi-Fi, short enough that an unplugged Bar does not make the assistant look stuck.
+const REQUEST_TIMEOUT_MS = 4000;
+
+export function createConnections(env: NodeJS.ProcessEnv = process.env, timeout = REQUEST_TIMEOUT_MS): Connections {
   const { bar, warnings } = loadBarConfig(env);
   const lanAddr = env.BUSY_LAN_ADDR?.trim();
   const lan = bar.isUsb && lanAddr && isLanAddress(lanAddr)
