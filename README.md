@@ -55,6 +55,12 @@ Plug the Bar in over USB and leave the address blank to use `10.0.4.20`.
 On Wi-Fi, tell your assistant the Bar's address, for example *"my Bar is at
 192.168.1.50"*. You can also use the BUSY cloud endpoint with a token.
 
+To use both USB and LAN, leave the main address at the USB default and enter
+the **LAN fallback address** for the same Bar. The MCP checks USB before each
+operation and uses LAN when it can't reach USB. It checks USB again on the
+next operation, so reconnecting the cable restores USB preference. In Codex,
+run `npx busybar-mcp install --yes --addr 10.0.4.20 --lan-addr 192.168.1.50`.
+
 ### Optional busybar-wm setup
 
 Start [busybar-wm 2.1.0 or later](https://github.com/viirtualp1/busybar-wm#quick-start).
@@ -119,6 +125,7 @@ Set in the plugin's settings (Claude Code), the extension's (Claude Desktop), or
 | Key | |
 | --- | --- |
 | `BUSY_ADDR` | Bar address (default `10.0.4.20` over USB), or the WM address |
+| `BUSY_LAN_ADDR` | optional Wi-Fi or LAN address of the same Bar, used only when the main address is USB |
 | `WM_API_TOKEN` | control token, if configured on the WM |
 | `BUSY_HTTP_PASSWORD` | if the Bar's HTTP access is locked |
 | `BUSY_TOKEN` | cloud token, with `BUSY_ADDR=https://api.busy.app` |

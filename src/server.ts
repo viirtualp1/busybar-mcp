@@ -25,6 +25,7 @@ import {
   type Scene,
   type StockKind,
 } from './bar.js';
+import { isLanAddress } from './connection.js';
 import { LOGOS } from './logos.js';
 import { prepareImage } from './media/image.js';
 import { audioToSnd, MAX_SECONDS, melodyToSnd } from './media/sound.js';
@@ -475,15 +476,22 @@ server.registerTool(
   {
     title: 'Connect to a Bar',
     description:
-      'Save a direct USB, Wi-Fi or cloud address, or a busybar-wm address for shared display orchestration.',
+      'Save a direct USB, Wi-Fi or cloud address, or a busybar-wm address. For USB, optionally set a LAN fallback.',
     inputSchema: {
       addr: z.string().min(1),
+      lan_addr: z.string().trim().refine((addr) => addr === '' || isLanAddress(addr), 'Enter a local IP address or HTTP(S) URL.').optional()
+        .describe('Optional LAN fallback for USB. Pass an empty string to remove it.'),
       password: z.string().optional().describe('HTTP access password, if the Bar has one'),
       token: z.string().optional().describe('Cloud token from cloud.busy.app/api-tokens'),
     },
   },
-  async ({ addr, password, token }) => {
+  async ({ addr, lan_addr, password, token }) => {
     const next = { ...readSettings(), BUSY_ADDR: addr, BUSY_HTTP_PASSWORD: password, BUSY_TOKEN: token };
+
+    if (lan_addr !== undefined) {
+      next.BUSY_LAN_ADDR = lan_addr;
+      process.env.BUSY_LAN_ADDR = lan_addr;
+    }
 
     writeSettings(next);
     process.env.BUSY_ADDR = addr;
@@ -493,7 +501,7 @@ server.registerTool(
 
     try {
       const system = await status();
-      return result({ saved: true, addr, reachable: true, firmware: system.firmware?.version });
+      return result({ saved: true, addr: connectionInfo().addr, reachable: true, firmware: system.firmware?.version });
     } catch (err) {
       return result({ saved: true, addr, reachable: false, error: describe(err) });
     }
@@ -507,9 +515,11 @@ server.registerTool(
     const info = connectionInfo();
 
     try {
-      return result({ ...info, version: VERSION, update: update ?? null, system: info.dryRun ? null : await status() });
+      const system = info.dryRun ? null : await status();
+
+      return result({ ...connectionInfo(), version: VERSION, update: update ?? null, system });
     } catch (err) {
-      return result({ ...info, version: VERSION, update: update ?? null, reachable: false, error: describe(err) });
+      return result({ ...connectionInfo(), version: VERSION, update: update ?? null, reachable: false, error: describe(err) });
     }
   },
 );
@@ -528,9 +538,11 @@ server.registerTool(
       return result({ addr, dryRun });
     }
 
-    const [wm, device] = await Promise.all([wmStatus(addr), diagnostics()]);
+    const device = await diagnostics();
+    const selected = connectionInfo().addr;
+    const wm = await wmStatus(selected);
 
-    return result({ addr, wm, device });
+    return result({ addr: selected, wm, device });
   },
 );
 

@@ -6,7 +6,7 @@ export type Settings = Partial<Record<SettingKey, string>>;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
-export const SETTING_KEYS = ['BUSY_ADDR', 'BUSY_HTTP_PASSWORD', 'BUSY_TOKEN', 'GITHUB_TOKEN', 'BUSYBAR_DRY_RUN', 'DRAW_PRIORITY', 'WM_API_TOKEN'] as const;
+export const SETTING_KEYS = ['BUSY_ADDR', 'BUSY_LAN_ADDR', 'BUSY_HTTP_PASSWORD', 'BUSY_TOKEN', 'GITHUB_TOKEN', 'BUSYBAR_DRY_RUN', 'DRAW_PRIORITY', 'WM_API_TOKEN'] as const;
 
 export const DEFAULT_BAR_ADDR = '10.0.4.20';
 

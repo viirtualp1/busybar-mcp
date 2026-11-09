@@ -54,6 +54,7 @@ const manifest = {
       args: ['${__dirname}/server/index.mjs'],
       env: {
         BUSY_ADDR: '${user_config.busy_addr}',
+        BUSY_LAN_ADDR: '${user_config.busy_lan_addr}',
         WM_API_TOKEN: '${user_config.wm_api_token}',
         BUSY_HTTP_PASSWORD: '${user_config.busy_http_password}',
         BUSY_TOKEN: '${user_config.busy_token}',
@@ -94,6 +95,12 @@ const manifest = {
       type: 'string',
       title: 'BUSY Bar or window manager address',
       description: 'Defaults to saved settings or 10.0.4.20 over USB.',
+      required: false,
+    },
+    busy_lan_addr: {
+      type: 'string',
+      title: 'LAN fallback address',
+      description: 'Optional local address of the same Bar. Used if USB cannot be reached.',
       required: false,
     },
     wm_api_token: {
@@ -199,6 +206,12 @@ const pluginManifest = {
       type: 'string',
       title: 'BUSY Bar or window manager address',
       description: 'Defaults to 10.0.4.20 over USB.',
+      default: '',
+    },
+    BUSY_LAN_ADDR: {
+      type: 'string',
+      title: 'LAN fallback address',
+      description: 'Optional local address of the same Bar. Used if USB cannot be reached.',
       default: '',
     },
     WM_API_TOKEN: {

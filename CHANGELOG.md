@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0
+
+- Set an optional LAN fallback address for the same Bar. The MCP prefers USB and uses LAN when USB is unreachable.
+- Reconnecting USB restores USB preference on the next command. An explicit window manager or cloud address keeps its existing routing.
+
 ## 0.9.0
 
 - Connect directly over USB with the default settings to draw, play sounds, and read device diagnostics.

@@ -1,5 +1,5 @@
 import {
-  BusyBar,
+  type BusyBar,
   generateXpm2,
   type AnimationElement,
   type ImageElement,
@@ -8,13 +8,13 @@ import {
   type XpmBitmapElement,
 } from '@busy-app/busy-lib';
 import { createHash } from 'node:crypto';
-import { loadBarConfig } from 'busybar-kit/config';
 import { BACK, FRONT } from 'busybar-kit/device';
 import { isLowPriority } from 'busybar-kit/errors';
 import { Bitmap, parseColor, renderOnto, type Rgba } from 'busybar-kit/preview';
+import { createConnections, selectConnection } from './connection.js';
 import type { Display } from './media/image.js';
-import { wmCommand } from './wm.js';
 import { toAscii } from './text.js';
+import { wmCommand } from './wm.js';
 
 export type { Display };
 
@@ -83,11 +83,11 @@ const REACH_HINT =
   'Check the Bar is on and plugged in over USB (or on the same Wi-Fi). On macOS 15+, the app running this ' +
   '(Claude, ChatGPT/Codex) also needs System Settings → Privacy & Security → Local Network turned on.';
 
-let { bar: config, warnings } = barConfig();
+let connections = createConnections();
+
+let active = connections.primary;
 
 const dryRun = process.env.BUSYBAR_DRY_RUN === '1';
-
-let client = makeClient();
 
 /** Element ids this process put on each display, so drawing one display leaves the other alone. */
 const shown: Record<Display, string[]> = { front: [], back: [] };
@@ -99,25 +99,27 @@ const uploaded = new Set<string>();
 
 const stockCache = new Map<StockKind, string[]>();
 
-function barConfig() {
-  const loaded = loadBarConfig();
+async function currentConnection() {
+  const configured = connections;
+  const selected = await selectConnection(configured);
 
-  return { ...loaded, warnings: loaded.warnings.filter((warning) => !warning.startsWith('Wi-Fi needs')) };
+  if (configured !== connections) {
+    throw new Error('The BUSY Bar connection changed. Retry the command.');
+  }
+
+  active = selected;
+
+  return selected;
 }
 
-function makeClient() {
-  return new BusyBar({
-    addr: config.busyAddr,
-    token: config.busyToken || undefined,
-    HTTPAccessPassword: config.busyHttpPassword || undefined,
-    timeout: 10_000,
-  });
+function isCurrent(client: BusyBar) {
+  return client === connections.primary.client || client === connections.lan?.client;
 }
 
 /** Points the running server at another Bar (after `env` changed), forgetting what it knew about the old one. */
 export function reconnect() {
-  ({ bar: config, warnings } = barConfig());
-  client = makeClient();
+  connections = createConnections();
+  active = connections.primary;
   shown.front = [];
   shown.back = [];
   synced = false;
@@ -126,7 +128,13 @@ export function reconnect() {
 }
 
 export function connectionInfo() {
-  return { addr: config.busyAddr, cloud: config.isCloud, dryRun, warnings };
+  return {
+    addr: active.config.busyAddr,
+    cloud: active.config.isCloud,
+    lanFallback: connections.lan?.config.busyAddr,
+    dryRun,
+    warnings: connections.warnings,
+  };
 }
 
 /** `#RGB`, `#RRGGBB` or `#RRGGBBAA` → `#RRGGBBAA`, which is what the device wants. */
@@ -293,13 +301,13 @@ export function preview(scene: Scene) {
 }
 
 async function upload(connected: BusyBar, file: string, data: Buffer) {
-  if (connected === client && uploaded.has(file)) {
+  if (isCurrent(connected) && uploaded.has(file)) {
     return;
   }
 
   await connected.assetsUpload({ application_name: APP_NAME, file, data });
 
-  if (connected === client) {
+  if (isCurrent(connected)) {
     uploaded.add(file);
   }
 }
@@ -335,10 +343,10 @@ export async function draw(scene: Scene): Promise<DrawResult> {
   }
 
   try {
-    const connected = client;
+    const { client: connected, config } = await currentConnection();
     const pictures = await Promise.all((scene.images ?? []).map((image, i) => imageElement(connected, `img${i}`, image)));
 
-    if (connected !== client) {
+    if (!isCurrent(connected)) {
       throw new Error('The BUSY Bar connection changed. Retry the display command.');
     }
 
@@ -363,7 +371,7 @@ export async function draw(scene: Scene): Promise<DrawResult> {
       elements,
     });
 
-    if (connected !== client) {
+    if (!isCurrent(connected)) {
       return { sent: true, preview: png };
     }
 
@@ -375,7 +383,7 @@ export async function draw(scene: Scene): Promise<DrawResult> {
     shown[display] = elements.map((element) => element.id);
     synced = true;
 
-    return { sent: true, preview: png, actual: scene.photo === false ? undefined : await settledScreenshot(display) };
+    return { sent: true, preview: png, actual: scene.photo === false ? undefined : await settledScreenshot(connected, display) };
   } catch (err) {
     const error = isLowPriority(err)
       ? 'the Bar is showing something more important (an active BUSY work session or another app), so nothing was drawn. Retry with urgent: true only if the user asked to interrupt it'
@@ -386,11 +394,11 @@ export async function draw(scene: Scene): Promise<DrawResult> {
 }
 
 /** The screen a moment after a draw; undefined if the Bar won't say. */
-async function settledScreenshot(display: Display) {
+async function settledScreenshot(connected: BusyBar, display: Display) {
   await new Promise((done) => setTimeout(done, 400));
 
   try {
-    return await screenshot(display);
+    return await readScreenshot(connected, display);
   } catch {
     // The draw itself succeeded; the preview stands in for the photo.
     return undefined;
@@ -403,13 +411,12 @@ export async function clear(display?: Display) {
     return;
   }
 
-  const connected = client;
-  const { busyAddr, isUsb, isCloud } = config;
+  const { client: connected, config: { busyAddr, isUsb, isCloud } } = await currentConnection();
 
-  if (!isUsb && !isCloud) {
+  if (!isUsb && !isCloud && !connections.lan) {
     await wmCommand(busyAddr, { action: 'clear', display }, { optional: true });
 
-    if (connected !== client) {
+    if (!isCurrent(connected)) {
       return;
     }
   }
@@ -417,7 +424,7 @@ export async function clear(display?: Display) {
   if (display && synced) {
     await clearOwn(connected, shown[display]);
 
-    if (connected === client) {
+    if (isCurrent(connected)) {
       shown[display] = [];
     }
 
@@ -426,7 +433,7 @@ export async function clear(display?: Display) {
 
   await clearOwn(connected);
 
-  if (connected !== client) {
+  if (!isCurrent(connected)) {
     return;
   }
 
@@ -454,6 +461,12 @@ async function clearOwn(connected: BusyBar, ids?: string[]) {
 
 /** The real screen, as a PNG. */
 export async function screenshot(display: Display = 'front') {
+  const { client } = await currentConnection();
+
+  return readScreenshot(client, display);
+}
+
+async function readScreenshot(client: BusyBar, display: Display) {
   const screen = SCREEN[display];
   const data = await client.displayScreenFrameGet({ display: screen.index }, { dataType: 'binary', format: 'rgba' });
 
@@ -482,9 +495,12 @@ export async function listStock(kind: StockKind) {
     return cached;
   }
 
+  const { client } = await currentConnection();
   const { list } = await client.storageListGet({ path: `/ext/apps_assets/shared/${kind}` });
   const names = list.filter((entry) => entry.type === 'file' && !entry.name.startsWith('.')).map((entry) => entry.name);
-  stockCache.set(kind, names);
+  if (isCurrent(client)) {
+    stockCache.set(kind, names);
+  }
 
   return names;
 }
@@ -494,7 +510,7 @@ export async function playSound(sound: { stock: string } | { snd: Buffer }) {
     return;
   }
 
-  const connected = client;
+  const { client: connected } = await currentConnection();
 
   if ('stock' in sound) {
     await connected.audioPlay({ application_name: APP_NAME, stock_path: `shared/${sound.stock}` });
@@ -507,11 +523,13 @@ export async function playSound(sound: { stock: string } | { snd: Buffer }) {
 }
 
 export async function status() {
+  const { client } = await currentConnection();
+
   return client.systemStatusGet();
 }
 
 export async function diagnostics() {
-  const connected = client;
+  const { client: connected } = await currentConnection();
   const [system, updates, autoUpdate] = await Promise.all([
     readDiagnostic(() => connected.systemStatusGet()),
     readDiagnostic(() => connected.updateStatusGet()),
@@ -522,7 +540,7 @@ export async function diagnostics() {
 }
 
 export async function connectivity() {
-  const connected = client;
+  const { client: connected } = await currentConnection();
   const [wifi, ble, transport, interfaces] = await Promise.all([
     readDiagnostic(() => connected.wifiStatusGet()),
     readDiagnostic(() => connected.bleStatusGet()),
@@ -552,7 +570,7 @@ export function describe(err: unknown) {
   }
 
   if (err instanceof Error && err.name === 'TimeoutError') {
-    return `the Bar at ${config.busyAddr} did not answer in time. ${REACH_HINT}`;
+    return `the Bar at ${active.config.busyAddr} did not answer in time. ${REACH_HINT}`;
   }
 
   // Node's fetch says only "fetch failed"; the reason is in `cause`.
@@ -560,7 +578,7 @@ export function describe(err: unknown) {
 
   if (cause) {
     const code = 'code' in cause && typeof cause.code === 'string' ? cause.code : cause.message;
-    return `cannot reach the Bar at ${config.busyAddr} (${code}). ${REACH_HINT}`;
+    return `cannot reach the Bar at ${active.config.busyAddr} (${code}). ${REACH_HINT}`;
   }
 
   return err instanceof Error ? err.message : String(err);
